@@ -1,18 +1,20 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { createChart } from "lightweight-charts";
-import { Paper } from "@mantine/core";
+import { createChart, CandlestickSeries, type IChartApi, type ISeriesApi } from "lightweight-charts";
 
-export function TradingChart() {
-  const chartRef = useRef<HTMLDivElement | null>(null);
+export default function TradingChart() {
+  const elRef = useRef<HTMLDivElement | null>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
 
   useEffect(() => {
-    if (!chartRef.current) return;
+    const el = elRef.current;
+    if (!el) return;
 
-    const chart = createChart(chartRef.current, {
-      width: chartRef.current.clientWidth,
-      height: 400,
+    const chart = createChart(el, {
+      width: el.clientWidth,
+      height: 520,
       layout: {
         background: { color: "#0f172a" },
         textColor: "#d1d5db",
@@ -21,9 +23,12 @@ export function TradingChart() {
         vertLines: { color: "#1f2937" },
         horzLines: { color: "#1f2937" },
       },
+      timeScale: { borderColor: "#1f2937" },
+      rightPriceScale: { borderColor: "#1f2937" },
     });
 
-    const series = chart.addCandlestickSeries();
+    // ✅ API mới
+    const series = chart.addSeries(CandlestickSeries, {});
 
     series.setData([
       { time: "2024-01-01", open: 1800, high: 1810, low: 1795, close: 1805 },
@@ -31,21 +36,25 @@ export function TradingChart() {
       { time: "2024-01-03", open: 1815, high: 1825, low: 1805, close: 1810 },
     ]);
 
-    const resize = () => {
-      chart.applyOptions({ width: chartRef.current!.clientWidth });
+    chart.timeScale().fitContent();
+
+    chartRef.current = chart;
+    seriesRef.current = series;
+
+    const onResize = () => {
+      if (!elRef.current || !chartRef.current) return;
+      chartRef.current.applyOptions({ width: elRef.current.clientWidth });
     };
 
-    window.addEventListener("resize", resize);
+    window.addEventListener("resize", onResize);
 
     return () => {
-      window.removeEventListener("resize", resize);
+      window.removeEventListener("resize", onResize);
       chart.remove();
+      chartRef.current = null;
+      seriesRef.current = null;
     };
   }, []);
 
-  return (
-    <Paper withBorder radius="lg" p="md">
-      <div ref={chartRef} />
-    </Paper>
-  );
+  return <div ref={elRef} style={{ width: "100%", height: 520 }} />;
 }

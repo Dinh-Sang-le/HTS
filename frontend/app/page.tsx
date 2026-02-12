@@ -1,13 +1,5 @@
-import { HTSAppShell } from "@/components/AppShell";
-import { KpiCards } from "@/components/KpiCards";
-import { PositionsTable } from "@/components/PositionsTable";
+import Dashboard from "@/pages/Dashboard";
 
 export default function Page() {
-  return (
-    <HTSAppShell>
-      <KpiCards />
-      <div style={{ height: 16 }} />
-      <PositionsTable />
-    </HTSAppShell>
-  );
+  return <Dashboard />;
 }

@@ -24,3 +24,62 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+/* ===== HTS Pro background ===== */
+.hts-bg {
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 600px at 15% 10%, rgba(0, 180, 255, 0.18), transparent 55%),
+    radial-gradient(900px 500px at 85% 20%, rgba(124, 58, 237, 0.16), transparent 50%),
+    radial-gradient(900px 700px at 50% 100%, rgba(16, 185, 129, 0.10), transparent 60%),
+    linear-gradient(180deg, rgba(8, 10, 14, 1) 0%, rgba(10, 12, 18, 1) 100%);
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.glow {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 18px 50px rgba(0, 0, 0, 0.45);
+}
+
+/* subtle animated shimmer */
+.shimmer {
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.02) 0%,
+    rgba(255,255,255,0.08) 50%,
+    rgba(255,255,255,0.02) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+
+@keyframes shimmer {
+  0% { background-position: 0% 0; }
+  100% { background-position: 200% 0; }
+}
+:root {
+  color-scheme: dark;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #141414;         /* nền dashboard */
+  color: rgba(255,255,255,0.92);
+}
+
+/* Mantine app wrapper */
+.mantine-AppShell-main {
+  background: transparent !important; /* để lấy body nền */
+}
+
+/* Optional: scrollbars (đỡ sáng) */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 10px; }
+*::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); }
