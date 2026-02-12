@@ -83,3 +83,57 @@ body {
 *::-webkit-scrollbar { width: 10px; height: 10px; }
 *::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 10px; }
 *::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); }
+/* ===== HTS Global Background ===== */
+:root{
+  --hts-bg-0: #0b0d12;
+  --hts-bg-1: #0b1220;
+}
+
+html, body {
+  height: 100%;
+}
+
+body{
+  background: radial-gradient(1200px 700px at 15% 10%, rgba(59,130,246,0.14), transparent 55%),
+              radial-gradient(1000px 600px at 90% 15%, rgba(236,72,153,0.12), transparent 55%),
+              radial-gradient(1000px 700px at 60% 95%, rgba(16,185,129,0.10), transparent 55%),
+              linear-gradient(180deg, var(--hts-bg-0), var(--hts-bg-1));
+  color: rgba(255,255,255,0.9);
+}
+
+/* watermark ribbon */
+body::before{
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    url("/assets/hts-mark.png");
+  background-repeat: no-repeat;
+  background-position: 80% 35%;
+  background-size: 520px auto;
+  opacity: 0.09;
+  filter: blur(0px) saturate(1.05);
+  transform: rotate(-8deg);
+}
+
+/* extra noise layer (optional, looks premium) */
+body::after{
+  content:"";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(800px 400px at 70% 30%, rgba(255,255,255,0.04), transparent 60%);
+  opacity: 0.9;
+}
+.hts-loader-spin{
+  animation: htsSpin 1.05s linear infinite;
+  transform-origin: 50% 50%;
+}
+
+@keyframes htsSpin{
+  from { transform: rotate(0deg) scale(1); }
+  to   { transform: rotate(360deg) scale(1); }
+}

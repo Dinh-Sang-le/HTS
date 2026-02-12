@@ -1,107 +1,68 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import { Badge, Group, Paper, Table, Text } from "@mantine/core";
+import { useMemo } from "react";
 
-type Row = { price: number; qty: number };
+type AnyDepth = any;
+type Row = { bid: number; bidQty: number; ask: number; askQty: number };
 
 function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
 }
 
-// PRNG có seed để client-side update ổn định (không dùng Math.random trong render)
-function mulberry32(seed: number) {
-  return function () {
-    let t = (seed += 0x6d2b79f5);
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+function pickPQ(x: any): { p: number; q: number } {
+  // support {price, qty} or {p, q} or [p,q]
+  if (Array.isArray(x)) return { p: Number(x[0] ?? 0), q: Number(x[1] ?? 0) };
+  const p = Number(x?.price ?? x?.p ?? 0);
+  const q = Number(x?.qty ?? x?.q ?? x?.size ?? 0);
+  return { p, q };
 }
 
-export default function OrderBook() {
-  const [mounted, setMounted] = useState(false);
+function makeRowsFromDepth(depth: AnyDepth | null | undefined, fallbackMid = 2030.99): Row[] {
+  const bidsRaw = depth?.bids ?? depth?.bid ?? [];
+  const asksRaw = depth?.asks ?? depth?.ask ?? [];
 
-  // ✅ SSR-safe: dữ liệu cố định (server và client render lần đầu giống nhau)
-  const [bids, setBids] = useState<Row[]>([
-    { price: 2030.94, qty: 0.63 },
-    { price: 2030.91, qty: 0.91 },
-    { price: 2030.88, qty: 1.7 },
-    { price: 2030.85, qty: 1.64 },
-    { price: 2030.81, qty: 2.52 },
-  ]);
+  const bids = Array.isArray(bidsRaw) ? bidsRaw : [];
+  const asks = Array.isArray(asksRaw) ? asksRaw : [];
 
-  const [asks, setAsks] = useState<Row[]>([
-    { price: 2031.05, qty: 0.37 },
-    { price: 2031.08, qty: 0.57 },
-    { price: 2031.11, qty: 1.1 },
-    { price: 2031.14, qty: 0.8 },
-    { price: 2031.21, qty: 1.06 },
-  ]);
+  const N = 10;
 
-  const mid = useMemo(() => {
-    const b = bids[0]?.price ?? 0;
-    const a = asks[0]?.price ?? 0;
-    return a && b ? (a + b) / 2 : 0;
-  }, [bids, asks]);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // ✅ Realtime mock chỉ chạy SAU mount -> không gây hydration mismatch
-  useEffect(() => {
-    if (!mounted) return;
-
-    const rand = mulberry32(777);
-
-    const id = setInterval(() => {
-      const step = () => (rand() - 0.5) * 0.06;
-
-      setBids((prev) => {
-        const next = prev.map((r, i) => {
-          const p = +(r.price + step() - i * 0.01).toFixed(2);
-          const q = +(clamp(r.qty + (rand() - 0.5) * 0.35, 0.1, 9)).toFixed(2);
-          return { price: p, qty: q };
-        });
-        // sort bid desc
-        next.sort((x, y) => y.price - x.price);
-        return next;
+  if (bids.length && asks.length) {
+    const rows: Row[] = [];
+    for (let i = 0; i < N; i++) {
+      const b = pickPQ(bids[i] ?? bids[bids.length - 1]);
+      const a = pickPQ(asks[i] ?? asks[asks.length - 1]);
+      rows.push({
+        bid: b.p,
+        bidQty: clamp(b.q, 0.01, 999),
+        ask: a.p,
+        askQty: clamp(a.q, 0.01, 999),
       });
+    }
+    return rows;
+  }
 
-      setAsks((prev) => {
-        const next = prev.map((r, i) => {
-          const p = +(r.price + step() + i * 0.01).toFixed(2);
-          const q = +(clamp(r.qty + (rand() - 0.5) * 0.35, 0.1, 9)).toFixed(2);
-          return { price: p, qty: q };
-        });
-        // sort ask asc
-        next.sort((x, y) => x.price - y.price);
-        return next;
-      });
-    }, 700);
+  // fallback mock ladder from mid
+  const mid = fallbackMid;
+  return Array.from({ length: N }).map((_, i) => ({
+    bid: +(mid - (i + 1) * 0.05).toFixed(2),
+    bidQty: +(0.3 + i * 0.08).toFixed(2),
+    ask: +(mid + (i + 1) * 0.05).toFixed(2),
+    askQty: +(0.35 + i * 0.07).toFixed(2),
+  }));
+}
 
-    return () => clearInterval(id);
-  }, [mounted]);
+export default function OrderBook(props: { depth?: AnyDepth; mid?: number | null }) {
+  const rows = useMemo(() => makeRowsFromDepth(props.depth, props.mid ?? 2030.99), [props.depth, props.mid]);
+
+  const mid =
+    rows[0] ? ((rows[0].bid + rows[0].ask) / 2).toFixed(2) : "--";
 
   return (
-    <Paper
-      withBorder
-      radius="lg"
-      p="md"
-      style={{
-        background: "rgba(255,255,255,0.03)",
-        borderColor: "rgba(255,255,255,0.08)",
-      }}
-    >
+    <Paper withBorder radius="lg" p="md">
       <Group justify="space-between" mb="xs">
         <Text fw={800}>Order Book</Text>
-        <Group gap="xs">
-          <Badge variant="light">MOCK</Badge>
-          <Badge variant="light" color="blue">
-            MID {mid ? mid.toFixed(2) : "--"}
-          </Badge>
-        </Group>
+        <Badge variant="light">MID {mid}</Badge>
       </Group>
 
       <Table highlightOnHover>
@@ -115,20 +76,19 @@ export default function OrderBook() {
         </Table.Thead>
 
         <Table.Tbody>
-          {(mounted ? bids : bids).map((b, i) => (
-            <Table.Tr key={`ob-${i}`}>
+          {rows.map((r, i) => (
+            <Table.Tr key={i}>
               <Table.Td c="green" fw={700}>
-                {b.price.toFixed(2)}
+                {r.bid.toFixed(2)}
               </Table.Td>
               <Table.Td ta="right" c="dimmed">
-                {b.qty.toFixed(2)}
+                {r.bidQty.toFixed(2)}
               </Table.Td>
-
               <Table.Td c="red" fw={700}>
-                {(asks[i]?.price ?? 0).toFixed(2)}
+                {r.ask.toFixed(2)}
               </Table.Td>
               <Table.Td ta="right" c="dimmed">
-                {(asks[i]?.qty ?? 0).toFixed(2)}
+                {r.askQty.toFixed(2)}
               </Table.Td>
             </Table.Tr>
           ))}
@@ -136,7 +96,7 @@ export default function OrderBook() {
       </Table>
 
       <Text size="xs" c="dimmed" mt="sm">
-        * Mock realtime (updates after mount) — safe for SSR.
+        Depth from feed if available, otherwise fallback mock.
       </Text>
     </Paper>
   );

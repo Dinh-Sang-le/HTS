@@ -1,117 +1,175 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Badge,
   Button,
   Group,
   NumberInput,
-  Paper,
   SegmentedControl,
   Slider,
   Stack,
   Text,
   TextInput,
 } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
-import { motion } from "framer-motion";
-import { IconArrowUpRight, IconArrowDownRight } from "@tabler/icons-react";
+import type { OrderType, Side, SymbolName } from "@/lib/tradeTypes";
+import { SYMBOL_SPECS, formatPrice, roundToDigits } from "@/lib/symbolSpecs";
 
-export default function OrderPanel() {
-  const [side, setSide] = useState<"BUY" | "SELL">("BUY");
-  const [lots, setLots] = useState<number>(0.1);
-  const [sl, setSl] = useState<number | undefined>(undefined);
-  const [tp, setTp] = useState<number | undefined>(undefined);
-  const [riskPct, setRiskPct] = useState<number>(1);
+export type OrderDraft = {
+  side: Side;
+  type: OrderType;
+  lots: number;
+  limitPrice: number | null;
+  slPips: number | null;
+  tpPips: number | null;
+  riskPct: number;
+  comment: string;
+};
 
-  const calc = useMemo(() => {
-    // demo tính toán đơn giản
-    const risk = sl ? Math.round(lots * 100 * 10) : 0;
-    const reward = tp ? Math.round(lots * 100 * 10) : 0;
-    return { risk, reward };
-  }, [lots, sl, tp]);
+export default function OrderPanel(props: {
+  symbol: SymbolName;
+  last: number;
+  spread?: number | null;
+  locked?: boolean;
+  ticketPrice?: number | null; // click from DOM ladder
+  onSubmit: (draft: OrderDraft) => void;
+}) {
+  const { symbol, last, spread, locked, ticketPrice, onSubmit } = props;
+  const spec = SYMBOL_SPECS[symbol];
 
-  const accent = side === "BUY" ? "green" : "red";
+  const [draft, setDraft] = useState<OrderDraft>({
+    side: "BUY",
+    type: "MARKET",
+    lots: 0.1,
+    limitPrice: null,
+    slPips: null,
+    tpPips: null,
+    riskPct: 1,
+    comment: "",
+  });
+
+  // DOM click -> auto set LIMIT price
+  useEffect(() => {
+    if (ticketPrice == null) return;
+    setDraft((d) => ({
+      ...d,
+      type: "LIMIT",
+      limitPrice: roundToDigits(ticketPrice, spec.digits),
+    }));
+  }, [ticketPrice, spec.digits]);
+
+  const canSubmit =
+    !locked &&
+    draft.lots > 0 &&
+    (draft.type === "MARKET" || (draft.limitPrice != null && draft.limitPrice > 0));
 
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}>
-      <Paper radius="lg" p="md" style={{ background: "rgba(0,0,0,0.18)" }}>
-        <Group justify="space-between" mb="sm">
-          <Text fw={800}>Order</Text>
-          <Badge variant="light" color={accent} leftSection={side === "BUY" ? <IconArrowUpRight size={14} /> : <IconArrowDownRight size={14} />}>
-            {side}
-          </Badge>
-        </Group>
+    <Stack gap="sm">
+      <Group justify="space-between">
+        <Text fw={700}>Order</Text>
+        <Badge variant="light">{symbol}</Badge>
+      </Group>
 
-        <Stack gap="sm">
-          <SegmentedControl
-            value={side}
-            onChange={(v) => setSide(v as any)}
-            data={[
-              { label: "BUY", value: "BUY" },
-              { label: "SELL", value: "SELL" },
-            ]}
-            fullWidth
-          />
+      <SegmentedControl
+        value={draft.side}
+        onChange={(v) => setDraft((d) => ({ ...d, side: v as Side }))}
+        data={[
+          { value: "BUY", label: "BUY" },
+          { value: "SELL", label: "SELL" },
+        ]}
+      />
 
-          <NumberInput
-            label="Lots"
-            value={lots}
-            onChange={(v) => setLots(Number(v) || 0)}
-            min={0.01}
-            step={0.01}
-            decimalScale={2}
-          />
+      <SegmentedControl
+        value={draft.type}
+        onChange={(v) => setDraft((d) => ({ ...d, type: v as OrderType }))}
+        data={[
+          { value: "MARKET", label: "Market" },
+          { value: "LIMIT", label: "Limit" },
+        ]}
+      />
 
-          <Group grow>
-            <NumberInput label="SL (pips)" value={sl} onChange={(v) => setSl(v as any)} min={0} />
-            <NumberInput label="TP (pips)" value={tp} onChange={(v) => setTp(v as any)} min={0} />
-          </Group>
+      <NumberInput
+        label="Lots"
+        value={draft.lots}
+        onChange={(v) => setDraft((d) => ({ ...d, lots: Number(v ?? 0) }))}
+        min={0}
+        step={0.01}
+        decimalScale={2}
+      />
 
+      {draft.type === "LIMIT" ? (
+        <NumberInput
+          label="Limit price"
+          value={draft.limitPrice}
+          onChange={(v) => setDraft((d) => ({ ...d, limitPrice: v == null ? null : Number(v) }))}
+          min={0}
+          decimalScale={spec.digits}
+          step={spec.pipSize}
+        />
+      ) : (
+        <Group justify="space-between">
           <Text size="sm" c="dimmed">
-            Risk control (demo)
+            Market @
           </Text>
-          <Slider value={riskPct} onChange={setRiskPct} min={0.25} max={3} step={0.25} marks={[{ value: 1, label: "1%" }]} />
-
-          <Group justify="space-between">
-            <Text size="sm" c="dimmed">
-              Risk (demo)
-            </Text>
-            <Text fw={800} c="red">
-              -${calc.risk}
-            </Text>
-          </Group>
-
-          <Group justify="space-between">
-            <Text size="sm" c="dimmed">
-              Reward (demo)
-            </Text>
-            <Text fw={800} c="green">
-              +${calc.reward}
-            </Text>
-          </Group>
-
-          <TextInput label="Comment (optional)" placeholder="Breakout / Reversal / News..." />
-
-          <Button
-            fullWidth
-            radius="md"
-            color={accent}
-            onClick={() =>
-              notifications.show({
-                title: "Order placed (mock)",
-                message: `${side} ${lots} lots • SL ${sl ?? "--"} • TP ${tp ?? "--"} • Risk ${riskPct}%`,
-              })
-            }
-          >
-            Place Order
-          </Button>
-
-          <Text size="xs" c="dimmed">
-            * Demo UI. Sau này nối MT5/OMS API.
+          <Text size="sm" fw={700}>
+            {last ? formatPrice(symbol, last) : "--"}
           </Text>
-        </Stack>
-      </Paper>
-    </motion.div>
+          <Text size="sm" c="dimmed">
+            Spread {spread ?? "--"}
+          </Text>
+        </Group>
+      )}
+
+      <Group grow>
+        <NumberInput
+          label="SL (pips)"
+          value={draft.slPips}
+          onChange={(v) => setDraft((d) => ({ ...d, slPips: v == null ? null : Number(v) }))}
+          min={0}
+          step={1}
+        />
+        <NumberInput
+          label="TP (pips)"
+          value={draft.tpPips}
+          onChange={(v) => setDraft((d) => ({ ...d, tpPips: v == null ? null : Number(v) }))}
+          min={0}
+          step={1}
+        />
+      </Group>
+
+      <Stack gap={6}>
+        <Text size="sm" c="dimmed">
+          Risk control (demo)
+        </Text>
+        <Slider
+          value={draft.riskPct}
+          onChange={(v) => setDraft((d) => ({ ...d, riskPct: v }))}
+          min={0}
+          max={5}
+          step={0.5}
+          label={(v) => `${v}%`}
+        />
+      </Stack>
+
+      <TextInput
+        label="Comment (optional)"
+        placeholder="Breakout / Reversal / News..."
+        value={draft.comment}
+        onChange={(e) => setDraft((d) => ({ ...d, comment: e.currentTarget.value }))}
+      />
+
+      <Button
+        fullWidth
+        color={draft.side === "BUY" ? "green" : "red"}
+        disabled={!canSubmit}
+        onClick={() => onSubmit(draft)}
+      >
+        Place Order
+      </Button>
+
+      <Text size="xs" c="dimmed">
+        Tip: click price in DOM ladder → auto set Limit price.
+      </Text>
+    </Stack>
   );
 }
