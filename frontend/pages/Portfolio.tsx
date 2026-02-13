@@ -671,7 +671,14 @@ export default function PortfolioPage() {
                     backdropFilter: "blur(8px)",
                   }}
                 />
-                <Bar dataKey="p" />
+                <Bar dataKey="p">
+                {dailyPnL.map((x, i) => (
+                  <Cell
+                    key={i}
+                    fill={x.p >= 0 ? "rgba(16,185,129,0.9)" : "rgba(239,68,68,0.9)"}
+                  />
+                ))}
+              </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>

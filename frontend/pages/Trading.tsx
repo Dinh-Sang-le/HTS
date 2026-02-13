@@ -1,4 +1,4 @@
-// pages/trading.tsx
+// frontend/pages/trading.tsx
 "use client";
 
 import dynamic from "next/dynamic";
@@ -34,7 +34,7 @@ import type { SymbolName } from "@/lib/fakeFeed";
 import { useFeed } from "@/lib/useFeed";
 import { evaluateRisk } from "@/lib/riskRules";
 import { useTradeEngine } from "@/lib/useTradeEngine";
-import { useTradeStore } from "@/lib/tradeStore";
+import { useTradeStore, type SavedOrder } from "@/lib/tradeStore";
 import { formatPrice } from "@/lib/symbolSpecs";
 
 import FloatingPanel from "@/components/FloatingPanel";
@@ -131,15 +131,17 @@ export default function TradingInstitutionalPage() {
 
   const { tick, depth, candles, spread, mounted } = useFeed(symbol);
 
-  // ===== OMS demo engine: tick -> fill limit + update pnl
+  // OMS engine (you already have)
   useTradeEngine(symbol as any, tick as any, spread);
 
   const placeOrder = useTradeStore((s) => s.placeOrder);
   const getOpenPosition = useTradeStore((s) => s.getOpenPosition);
+  const orders = useTradeStore((s) => s.orders);
+  const clearOrders = useTradeStore((s) => s.clearOrders);
+  const hasHydrated = useTradeStore((s) => s.hasHydrated);
+  const pos = getOpenPosition(symbol);
 
-  const pos = getOpenPosition(symbol as any);
-
-  // ===== confirm modal state
+  // confirm modal
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [lastPlaced, setLastPlaced] = useState<null | {
     id: string;
@@ -158,7 +160,7 @@ export default function TradingInstitutionalPage() {
     setConfirmOpen(true);
   };
 
-  // ===== risk snapshot (mock)
+  // risk snapshot mock
   const [riskSnap, setRiskSnap] = useState({
     equity: 25000,
     ddUsedPct: 18,
@@ -193,7 +195,6 @@ export default function TradingInstitutionalPage() {
     return <Badge color="green" variant="light">COMPLIANT</Badge>;
   }, [risk.status]);
 
-  // ===== UI state
   const [ticketPrice, setTicketPrice] = useState<number | null>(null);
   const [showLadder, setShowLadder] = useState(true);
   const [showFootprint, setShowFootprint] = useState(true);
@@ -225,8 +226,7 @@ export default function TradingInstitutionalPage() {
   const last = tick?.last ?? 0;
   const chg = tick?.chgPct ?? 0;
 
-  const cardBg =
-    "linear-gradient(180deg, rgba(18,18,18,0.78), rgba(18,18,18,0.62))";
+  const cardBg = "linear-gradient(180deg, rgba(18,18,18,0.78), rgba(18,18,18,0.62))";
 
   function doMarket(side: "BUY" | "SELL") {
     if (risk.blocked) {
@@ -236,7 +236,7 @@ export default function TradingInstitutionalPage() {
     if (!tick?.last) return;
 
     const r = placeOrder(
-      { symbol: symbol as any, side, type: "MARKET", lots: 0.1, slPips: null, tpPips: null, comment: "Market" } as any,
+      { symbol, side, type: "MARKET", lots: 0.1, slPips: null, tpPips: null, comment: "Market" } as any,
       { tick: tick as any, spread }
     );
 
@@ -263,9 +263,11 @@ export default function TradingInstitutionalPage() {
     }
   }
 
+  const recentOrders: SavedOrder[] = useMemo(() => orders.slice(0, 10), [orders]);
+
   return (
     <Stack gap="md">
-      {/* ===== Confirm Modal ===== */}
+      {/* Confirm Modal */}
       <Modal opened={confirmOpen} onClose={() => setConfirmOpen(false)} title="Order Confirmed" centered>
         {lastPlaced ? (
           <Stack gap="xs">
@@ -275,9 +277,7 @@ export default function TradingInstitutionalPage() {
             </Text>
             <Text size="sm">
               Price:{" "}
-              <b>
-                {lastPlaced.price ? formatPrice(lastPlaced.sym as any, lastPlaced.price) : "--"}
-              </b>
+              <b>{lastPlaced.price ? formatPrice(lastPlaced.sym as any, lastPlaced.price) : "--"}</b>
             </Text>
             <Group justify="space-between">
               <Text size="sm" c="dimmed">SL</Text>
@@ -289,9 +289,7 @@ export default function TradingInstitutionalPage() {
             </Group>
 
             {lastPlaced.comment ? (
-              <Text size="sm" c="dimmed">
-                Note: {lastPlaced.comment}
-              </Text>
+              <Text size="sm" c="dimmed">Note: {lastPlaced.comment}</Text>
             ) : null}
 
             <Button onClick={() => setConfirmOpen(false)} color="green">
@@ -397,9 +395,7 @@ export default function TradingInstitutionalPage() {
           <Title order={3} c={mounted ? (openPL >= 0 ? "green" : "red") : "dimmed"} suppressHydrationWarning>
             {mounted ? `${openPL >= 0 ? "+" : "-"}$${Math.abs(openPL).toFixed(0)}` : "--"}
           </Title>
-          <Text size="sm" c="dimmed" mt={6}>
-            Mark-to-market (mock)
-          </Text>
+          <Text size="sm" c="dimmed" mt={6}>Mark-to-market (mock)</Text>
         </MotionCard>
 
         <MotionCard withBorder radius="lg" p="md" variants={cardAnim} initial="hidden" animate="show" style={{ background: cardBg }}>
@@ -439,8 +435,7 @@ export default function TradingInstitutionalPage() {
 
               {ticketPrice ? <Badge variant="outline">Limit @{ticketPrice}</Badge> : null}
 
-              {/* ✅ show open position entry right at chart header */}
-              {pos ? (
+              {hasHydrated && pos ? (
                 <Badge variant="outline" color={pos.side === "BUY" ? "green" : "red"}>
                   POS {pos.side} {pos.lots.toFixed(2)} @ {formatPrice(pos.symbol as any, pos.entry)}
                 </Badge>
@@ -526,7 +521,7 @@ export default function TradingInstitutionalPage() {
 
               const r = placeOrder(
                 {
-                  symbol: symbol as any,
+                  symbol,
                   side: draft.side,
                   type: draft.type,
                   lots: draft.lots,
@@ -558,19 +553,13 @@ export default function TradingInstitutionalPage() {
                   comment: r.order.comment,
                 });
               } else {
-                notifications.show({
-                  title: "Order rejected",
-                  message: r.reason,
-                  color: "red",
-                });
+                notifications.show({ title: "Order rejected", message: r.reason, color: "red" });
               }
             }}
           />
 
           <Divider my="sm" />
-          <Text size="xs" c="dimmed">
-            Tip: click price in DOM ladder → set limit price.
-          </Text>
+          <Text size="xs" c="dimmed">Tip: click price in DOM ladder → set limit price.</Text>
         </MotionCard>
       </SimpleGrid>
 
@@ -581,7 +570,6 @@ export default function TradingInstitutionalPage() {
             <Text fw={700}>Order Book</Text>
             <Badge variant="light">mock/feed</Badge>
           </Group>
-
           <OrderBook depth={depth as any} mid={(depth?.mid ?? tick?.last) ?? null} />
         </MotionCard>
 
@@ -602,6 +590,50 @@ export default function TradingInstitutionalPage() {
         </MotionCard>
       </SimpleGrid>
 
+      {/* Order History */}
+      <MotionCard withBorder radius="lg" p="md" variants={cardAnim} initial="hidden" animate="show" style={{ background: cardBg }}>
+        <Group justify="space-between" mb="xs">
+          <Group gap="xs">
+            <Text fw={700}>Order History</Text>
+            <Badge variant="light">{orders.length} orders</Badge>
+          </Group>
+          <Group gap="xs">
+            <Button size="xs" variant="light" onClick={() => clearOrders()}>
+              Clear
+            </Button>
+          </Group>
+        </Group>
+
+        <Stack gap="xs">
+          {recentOrders.map((o) => (
+            <Group
+              key={o.id}
+              justify="space-between"
+              style={{
+                padding: "10px 10px",
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,0.06)",
+                background: "rgba(255,255,255,0.03)",
+              }}
+            >
+              <div>
+                <Text fw={800} size="sm">#{o.id}</Text>
+                <Text size="xs" c="dimmed">
+                  {o.sym} • {o.type} • {o.side} • Lots {o.lots}
+                  {o.type === "LIMIT" && o.limitPrice != null ? ` • Lmt ${formatPrice(o.sym as any, o.limitPrice)}` : ""}
+                </Text>
+              </div>
+
+              <Badge variant="light" color={o.side === "BUY" ? "green" : "red"}>
+                {o.price != null ? formatPrice(o.sym as any, o.price) : "--"}
+              </Badge>
+            </Group>
+          ))}
+
+          {!orders.length ? <Text size="sm" c="dimmed">No orders yet.</Text> : null}
+        </Stack>
+      </MotionCard>
+
       {/* Docked analytics */}
       <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
         <FloatingPanel id="sizing" title="Position Sizing" badge="Matrix" defaultDocked={true}>
@@ -618,14 +650,12 @@ export default function TradingInstitutionalPage() {
           {showFootprint ? (
             <FootprintMock symbol={symbol} mid={depth?.mid ?? tick?.last ?? null} />
           ) : (
-            <Text size="sm" c="dimmed">
-              Footprint hidden.
-            </Text>
+            <Text size="sm" c="dimmed">Footprint hidden.</Text>
           )}
         </FloatingPanel>
       </SimpleGrid>
 
-      {/* DOM Ladder floating */}
+      {/* DOM Ladder */}
       {showLadder ? (
         <FloatingPanel id="dom" title="Depth Ladder" badge="DOM" defaultDocked={false} onClose={() => setShowLadder(false)}>
           <DOMLadder

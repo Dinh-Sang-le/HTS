@@ -1,304 +1,446 @@
 // lib/tradeStore.ts
+"use client";
+
 import { create } from "zustand";
-import type { Order, PlaceOrderRequest, Position, SymbolName, Tick, TradeEvent } from "./tradeTypes";
-import { SYMBOL_SPECS, roundToDigits } from "./symbolSpecs";
+import { persist } from "zustand/middleware";
+import type { SymbolName } from "@/lib/fakeFeed";
 
-function uid(prefix = "id") {
-  return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
+export type Side = "BUY" | "SELL";
+export type OrderType = "MARKET" | "LIMIT";
+export type OrderStatus = "FILLED" | "OPEN" | "REJECTED" | "CANCELLED";
+
+export type TickLike = {
+  last: number;
+  bid?: number;
+  ask?: number;
+  ts?: number;
+};
+
+export type PlaceCtx = {
+  tick: TickLike;
+  spread?: number | null;
+};
+
+/** Lưu order history (nhiều bản ghi) */
+export type SavedOrder = {
+  id: string;
+  ts: number;
+  sym: SymbolName;
+
+  side: Side;
+  type: OrderType;
+  status: OrderStatus;
+
+  lots: number;
+
+  limitPrice?: number; // LIMIT
+  price?: number; // filled price
+
+  slPrice?: number | null;
+  tpPrice?: number | null;
+
+  comment?: string;
+};
+
+/** Position hiển thị trong PositionsTable (giữ nguyên Price & P/L) */
+export type Position = {
+  id: string; // PositionsTable dùng p.id
+  symbol: SymbolName;
+  side: Side;
+  lots: number;
+  entry: number;
+
+  // ✅ GIỮ NGUYÊN
+  last: number; // Price column
+  unrealizedPnl: number; // P/L column
+
+  openedAt: number;
+};
+
+type PlaceOrderInput = {
+  symbol: SymbolName;
+  side: Side;
+  type: OrderType;
+  lots: number;
+
+  limitPrice?: number;
+
+  slPips?: number | null;
+  tpPips?: number | null;
+
+  comment?: string;
+  riskPct?: number | null;
+};
+
+type EngineOrder = {
+  id: string;
+  symbol: SymbolName;
+  side: Side;
+  type: OrderType;
+  lots: number;
+  comment?: string;
+
+  filledPrice?: number;
+  limitPrice?: number;
+
+  slPrice?: number | null;
+  tpPrice?: number | null;
+
+  status: OrderStatus;
+};
+
+type PlaceResult =
+  | { ok: true; order: EngineOrder }
+  | { ok: false; reason: string };
+
+function uid(prefix = "id_") {
+  return `${prefix}${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
 }
 
-function calcSlTpPrices(req: PlaceOrderRequest, entryPrice: number) {
-  const spec = SYMBOL_SPECS[req.symbol];
-  const pip = spec.pipSize;
-
-  const slPips = req.slPips ?? null;
-  const tpPips = req.tpPips ?? null;
-
-  let slPrice: number | null = null;
-  let tpPrice: number | null = null;
-
-  if (slPips && slPips > 0) {
-    slPrice = req.side === "BUY" ? entryPrice - slPips * pip : entryPrice + slPips * pip;
-    slPrice = roundToDigits(slPrice, spec.digits);
-  }
-  if (tpPips && tpPips > 0) {
-    tpPrice = req.side === "BUY" ? entryPrice + tpPips * pip : entryPrice - tpPips * pip;
-    tpPrice = roundToDigits(tpPrice, spec.digits);
-  }
-
-  return { slPrice, tpPrice };
+/** MARKET fill price: BUY=ask, SELL=bid (derive from last +/- spread/2 if missing) */
+function marketFillPrice(side: Side, tick: TickLike, spread?: number | null) {
+  const last = tick.last ?? 0;
+  const spr = spread ?? 0;
+  const bid = tick.bid ?? (last - spr / 2);
+  const ask = tick.ask ?? (last + spr / 2);
+  return side === "BUY" ? ask : bid;
 }
 
-function markPriceFromTick(tick: Tick, spread?: number | null, side?: "BUY" | "SELL") {
+/** LIMIT fill condition */
+function shouldFillLimit(side: Side, limitPrice: number, tick: TickLike, spread?: number | null) {
   const last = tick.last ?? 0;
   const spr = spread ?? 0;
   const bid = tick.bid ?? (last - spr / 2);
   const ask = tick.ask ?? (last + spr / 2);
 
-  if (side === "BUY") return ask;
-  if (side === "SELL") return bid;
-  return last;
+  // BUY LIMIT fills when ask <= limit
+  // SELL LIMIT fills when bid >= limit
+  if (side === "BUY") return ask <= limitPrice;
+  return bid >= limitPrice;
 }
 
-function computeUnrealized(symbol: SymbolName, side: "BUY" | "SELL", lots: number, entry: number, last: number) {
-  const { pipSize, pipValuePerLotUSD } = SYMBOL_SPECS[symbol];
-  const diff = side === "BUY" ? last - entry : entry - last;
-  const pips = diff / pipSize;
-  return pips * pipValuePerLotUSD * lots;
+function weightedAvgPrice(p1: number, q1: number, p2: number, q2: number) {
+  const q = q1 + q2;
+  if (q <= 0) return p2;
+  return (p1 * q1 + p2 * q2) / q;
 }
 
-type TradeState = {
-  orders: Order[];
+/** Demo P/L: giữ đúng logic p.last + p.unrealizedPnl */
+function calcPnlUSD(pos: Pick<Position, "symbol" | "side" | "lots" | "entry">, last: number) {
+  const dir = pos.side === "BUY" ? 1 : -1;
+
+  // multiplier demo (bạn có thể thay theo symbolSpecs nếu muốn)
+  const mul =
+    pos.symbol === "XAUUSD"
+      ? 100
+      : pos.symbol === "USDJPY"
+      ? 100
+      : 100000; // EURUSD/GBPUSD demo
+
+  return (last - pos.entry) * dir * pos.lots * mul;
+}
+
+/** netting position: 1 position / symbol */
+function applyFillToPositions(prevPositions: Position[], fill: { sym: SymbolName; side: Side; lots: number; price: number; last: number }) {
+  const now = Date.now();
+  const cur = prevPositions.find((p) => p.symbol === fill.sym);
+
+  // no current => open new
+  if (!cur) {
+    const pos: Position = {
+      id: uid("pos_"),
+      symbol: fill.sym,
+      side: fill.side,
+      lots: fill.lots,
+      entry: fill.price,
+      last: fill.last,
+      unrealizedPnl: 0,
+      openedAt: now,
+    };
+    pos.unrealizedPnl = calcPnlUSD(pos, pos.last);
+    return [...prevPositions, pos];
+  }
+
+  // same side => increase & avg entry
+  if (cur.side === fill.side) {
+    const newLots = cur.lots + fill.lots;
+    const avgEntry = weightedAvgPrice(cur.entry, cur.lots, fill.price, fill.lots);
+
+    const updated: Position = {
+      ...cur,
+      lots: newLots,
+      entry: avgEntry,
+      last: fill.last,
+    };
+    updated.unrealizedPnl = calcPnlUSD(updated, updated.last);
+
+    return prevPositions.map((p) => (p.id === cur.id ? updated : p));
+  }
+
+  // opposite side => reduce/flip
+  const remaining = cur.lots - fill.lots;
+
+  // reduce (still cur side)
+  if (remaining > 0) {
+    const updated: Position = {
+      ...cur,
+      lots: remaining,
+      last: fill.last,
+    };
+    updated.unrealizedPnl = calcPnlUSD(updated, updated.last);
+    return prevPositions.map((p) => (p.id === cur.id ? updated : p));
+  }
+
+  // flat
+  if (remaining === 0) {
+    return prevPositions.filter((p) => p.id !== cur.id);
+  }
+
+  // flip: open new side with leftover
+  const newPos: Position = {
+    id: uid("pos_"),
+    symbol: fill.sym,
+    side: fill.side,
+    lots: Math.abs(remaining),
+    entry: fill.price,
+    last: fill.last,
+    unrealizedPnl: 0,
+    openedAt: now,
+  };
+  newPos.unrealizedPnl = calcPnlUSD(newPos, newPos.last);
+
+  return [...prevPositions.filter((p) => p.id !== cur.id), newPos];
+}
+
+type TradeStore = {
+  // hydration flag (fix mismatch SSR/client with persist)
+  hasHydrated: boolean;
+  setHasHydrated: (v: boolean) => void;
+
+  orders: SavedOrder[];
   positions: Position[];
-  events: TradeEvent[];
-  lastTickBySymbol: Partial<Record<SymbolName, Tick>>;
 
-  placeOrder: (req: PlaceOrderRequest, ctx: { tick: Tick; spread?: number | null }) =>
-    | { ok: true; order: Order }
-    | { ok: false; reason: string };
+  placeOrder: (input: PlaceOrderInput, ctx: PlaceCtx) => PlaceResult;
+  getOpenPosition: (symbol: SymbolName) => Position | null;
 
-  cancelOrder: (orderId: string) => void;
   closePosition: (positionId: string) => void;
 
-  onTick: (symbol: SymbolName, tick: Tick, spread?: number | null) => void;
+  /** update live mark -> keeps Price (last) & P/L (unrealizedPnl) */
+  updateMark: (symbol: SymbolName, last: number) => void;
 
-  getOpenPosition: (symbol: SymbolName) => Position | undefined;
+  /** fill open limit + update mark each tick */
+  processTick: (symbol: SymbolName, tick: TickLike, spread?: number | null) => void;
+
+  /** alias for your useTradeEngine.ts */
+  onTick: (symbol: SymbolName, tick: TickLike, spread?: number | null) => void;
+
+  clearOrders: () => void;
+  resetAll: () => void;
 };
 
-export const useTradeStore = create<TradeState>((set, get) => ({
-  orders: [],
-  positions: [],
-  events: [],
-  lastTickBySymbol: {},
+export const useTradeStore = create<TradeStore>()(
+  persist(
+    (set, get) => ({
+      hasHydrated: false,
+      setHasHydrated: (v) => set({ hasHydrated: v }),
 
-  getOpenPosition: (symbol) => get().positions.find((p) => p.symbol === symbol),
+      orders: [],
+      positions: [],
 
-  placeOrder: (req, ctx) => {
-    if (!req.symbol) return { ok: false, reason: "Missing symbol" };
-    if (!req.lots || req.lots <= 0) return { ok: false, reason: "Lots must be > 0" };
-    if (req.type === "LIMIT") {
-      if (!req.limitPrice || req.limitPrice <= 0) return { ok: false, reason: "Limit price is required" };
-    }
+      getOpenPosition: (symbol) => {
+        const p = get().positions.find((x) => x.symbol === symbol);
+        return p ?? null;
+      },
 
-    const order: Order = {
-      id: uid("ord"),
-      ts: Date.now(),
-      symbol: req.symbol,
-      side: req.side,
-      type: req.type,
-      lots: req.lots,
-      limitPrice: req.type === "LIMIT" ? req.limitPrice : undefined,
-      slPrice: null,
-      tpPrice: null,
-      comment: req.comment,
-      status: "PENDING",
-    };
+      clearOrders: () => set({ orders: [] }),
+      resetAll: () => set({ orders: [], positions: [] }),
 
-    // ===== MARKET fill ngay
-    if (req.type === "MARKET") {
-      const fill = markPriceFromTick(ctx.tick, ctx.spread, req.side);
-      const { slPrice, tpPrice } = calcSlTpPrices(req, fill);
+      closePosition: (positionId) => {
+        set((st) => ({
+          positions: st.positions.filter((p) => p.id !== positionId),
+        }));
+      },
 
-      order.status = "FILLED";
-      order.filledPrice = fill;
-      order.filledTs = Date.now();
-      order.slPrice = slPrice;
-      order.tpPrice = tpPrice;
+      updateMark: (symbol, last) => {
+        if (!Number.isFinite(last) || last <= 0) return;
 
-      const positions = [...get().positions];
-      const existing = positions.find((p) => p.symbol === req.symbol);
+        set((st) => ({
+          positions: st.positions.map((p) => {
+            if (p.symbol !== symbol) return p;
+            const pnl = calcPnlUSD(p, last);
+            return { ...p, last, unrealizedPnl: pnl };
+          }),
+        }));
+      },
 
-      let nextPos: Position;
+      placeOrder: (input, ctx) => {
+        const { tick, spread } = ctx;
 
-      if (!existing) {
-        nextPos = {
-          id: uid("pos"),
-          symbol: req.symbol,
-          side: req.side,
-          lots: req.lots,
-          entry: fill,
-          slPrice,
-          tpPrice,
-          openedTs: Date.now(),
-          last: ctx.tick.last,
-          unrealizedPnl: 0,
-          lastUpdateTs: Date.now(),
-        };
-        positions.push(nextPos);
-      } else {
-        // netting đơn giản
-        if (existing.side === req.side) {
-          const newLots = existing.lots + req.lots;
-          const avg = (existing.entry * existing.lots + fill * req.lots) / newLots;
-          nextPos = {
-            ...existing,
-            lots: newLots,
-            entry: avg,
-            slPrice: slPrice ?? existing.slPrice ?? null,
-            tpPrice: tpPrice ?? existing.tpPrice ?? null,
-            last: ctx.tick.last,
-            lastUpdateTs: Date.now(),
+        if (!input.symbol) return { ok: false, reason: "Symbol missing" };
+        if (!input.side) return { ok: false, reason: "Side missing" };
+        if (!input.type) return { ok: false, reason: "Type missing" };
+
+        const lots = Number(input.lots ?? 0);
+        if (!Number.isFinite(lots) || lots <= 0) return { ok: false, reason: "Lots must be > 0" };
+        if (!tick?.last || !Number.isFinite(tick.last) || tick.last <= 0) return { ok: false, reason: "No tick price" };
+
+        const id = uid("ord_");
+        const ts = Date.now();
+
+        // ===== MARKET: fill immediately
+        if (input.type === "MARKET") {
+          const fill = marketFillPrice(input.side, tick, spread);
+
+          const ord: SavedOrder = {
+            id,
+            ts,
+            sym: input.symbol,
+            side: input.side,
+            type: "MARKET",
+            status: "FILLED",
+            lots,
+            price: +fill,
+            comment: input.comment,
+            slPrice: null,
+            tpPrice: null,
           };
-          positions[positions.findIndex((p) => p.id === existing.id)] = nextPos;
-        } else {
-          const newLots = existing.lots - req.lots;
-          if (newLots > 0) {
-            nextPos = { ...existing, lots: newLots, last: ctx.tick.last, lastUpdateTs: Date.now() };
-            positions[positions.findIndex((p) => p.id === existing.id)] = nextPos;
-          } else if (newLots < 0) {
-            nextPos = {
-              ...existing,
-              side: req.side,
-              lots: Math.abs(newLots),
-              entry: fill,
-              slPrice,
-              tpPrice,
-              last: ctx.tick.last,
-              unrealizedPnl: 0,
-              lastUpdateTs: Date.now(),
-            };
-            positions[positions.findIndex((p) => p.id === existing.id)] = nextPos;
-          } else {
-            positions.splice(positions.findIndex((p) => p.id === existing.id), 1);
-            nextPos = { ...existing, last: ctx.tick.last, lastUpdateTs: Date.now() };
-          }
-        }
-      }
 
-      // ✅ ép kiểu events để TS không “đỏ set”
-      set((s) => {
-        const ev: TradeEvent[] = [
-          { type: "ORDER_PLACED", order },
-          { type: "ORDER_FILLED", order, position: nextPos },
-          ...s.events,
-        ].slice(0, 200);
+          // IMPORTANT: append new order, do not replace
+          set((st) => {
+            const nextOrders = [ord, ...st.orders].slice(0, 500);
 
-        return { orders: [order, ...s.orders], positions, events: ev };
-      });
-
-      return { ok: true, order };
-    }
-
-    // ===== LIMIT pending
-    set((s) => {
-      const ev: TradeEvent[] = [{ type: "ORDER_PLACED", order }, ...s.events].slice(0, 200);
-      return { orders: [order, ...s.orders], events: ev };
-    });
-
-    return { ok: true, order };
-  },
-
-  cancelOrder: (orderId) => {
-    set((s) => {
-      const ev: TradeEvent[] = [{ type: "ORDER_CANCELLED", orderId }, ...s.events].slice(0, 200);
-      return {
-        orders: s.orders.map((o) => (o.id === orderId && o.status === "PENDING" ? { ...o, status: "CANCELLED" } : o)),
-        events: ev,
-      };
-    });
-  },
-
-  closePosition: (positionId) => {
-    set((s) => {
-      const ev: TradeEvent[] = [{ type: "POSITION_CLOSED", positionId, realizedPnl: 0 }, ...s.events].slice(0, 200);
-      return { positions: s.positions.filter((p) => p.id !== positionId), events: ev };
-    });
-  },
-
-  onTick: (symbol, tick, spread) => {
-    set((s) => ({ lastTickBySymbol: { ...s.lastTickBySymbol, [symbol]: tick } }));
-
-    const st = get();
-
-    // fill LIMIT
-    const pending = st.orders.filter(
-      (o) => o.symbol === symbol && o.status === "PENDING" && o.type === "LIMIT" && o.limitPrice
-    );
-
-    let orders = st.orders;
-    let positions = [...st.positions];
-    let events = st.events;
-
-    if (pending.length) {
-      for (const o of pending) {
-        const last = tick.last;
-        const limit = o.limitPrice!;
-        const shouldFill = o.side === "BUY" ? last <= limit : last >= limit;
-        if (!shouldFill) continue;
-
-        const fillPrice = limit;
-
-        const filledOrder: Order = { ...o, status: "FILLED", filledPrice: fillPrice, filledTs: Date.now() };
-
-        const existing = positions.find((p) => p.symbol === symbol);
-        let nextPos: Position;
-
-        if (!existing) {
-          nextPos = {
-            id: uid("pos"),
-            symbol,
-            side: o.side,
-            lots: o.lots,
-            entry: fillPrice,
-            slPrice: o.slPrice ?? null,
-            tpPrice: o.tpPrice ?? null,
-            openedTs: Date.now(),
-            last: tick.last,
-            unrealizedPnl: 0,
-            lastUpdateTs: Date.now(),
-          };
-          positions.push(nextPos);
-        } else {
-          if (existing.side === o.side) {
-            const newLots = existing.lots + o.lots;
-            const avg = (existing.entry * existing.lots + fillPrice * o.lots) / newLots;
-            nextPos = {
-              ...existing,
-              lots: newLots,
-              entry: avg,
-              slPrice: (o.slPrice ?? existing.slPrice) ?? null,
-              tpPrice: (o.tpPrice ?? existing.tpPrice) ?? null,
+            const nextPositions = applyFillToPositions(st.positions, {
+              sym: input.symbol,
+              side: input.side,
+              lots,
+              price: +fill,
               last: tick.last,
-              lastUpdateTs: Date.now(),
-            };
-            positions[positions.findIndex((p) => p.id === existing.id)] = nextPos;
-          } else {
-            const newLots = existing.lots - o.lots;
-            if (newLots > 0) {
-              nextPos = { ...existing, lots: newLots, last: tick.last, lastUpdateTs: Date.now() };
-              positions[positions.findIndex((p) => p.id === existing.id)] = nextPos;
-            } else if (newLots < 0) {
-              nextPos = {
-                ...existing,
-                side: o.side,
-                lots: Math.abs(newLots),
-                entry: fillPrice,
-                slPrice: o.slPrice ?? null,
-                tpPrice: o.tpPrice ?? null,
-                last: tick.last,
-                lastUpdateTs: Date.now(),
-              };
-              positions[positions.findIndex((p) => p.id === existing.id)] = nextPos;
-            } else {
-              positions.splice(positions.findIndex((p) => p.id === existing.id), 1);
-              nextPos = { ...existing, last: tick.last, lastUpdateTs: Date.now() };
-            }
+            });
+
+            return { orders: nextOrders, positions: nextPositions };
+          });
+
+          return { ok: true, order: toEngineOrder(ord) };
+        }
+
+        // ===== LIMIT: store OPEN, fill later via processTick/onTick
+        if (input.type === "LIMIT") {
+          if (input.limitPrice == null || !Number.isFinite(input.limitPrice)) {
+            return { ok: false, reason: "Limit price missing" };
+          }
+
+          const ord: SavedOrder = {
+            id,
+            ts,
+            sym: input.symbol,
+            side: input.side,
+            type: "LIMIT",
+            status: "OPEN",
+            lots,
+            limitPrice: +input.limitPrice,
+            comment: input.comment,
+            slPrice: null,
+            tpPrice: null,
+          };
+
+          set((st) => ({
+            orders: [ord, ...st.orders].slice(0, 500),
+          }));
+
+          // optional immediate fill if already touched
+          if (shouldFillLimit(input.side, +input.limitPrice, tick, spread)) {
+            get().processTick(input.symbol, tick, spread);
+          }
+
+          return { ok: true, order: toEngineOrder(ord) };
+        }
+
+        return { ok: false, reason: "Unsupported order type" };
+      },
+
+      processTick: (symbol, tick, spread) => {
+        const st = get();
+
+        // 1) update mark for Price/P&L
+        get().updateMark(symbol, tick.last);
+
+        // 2) fill OPEN LIMIT orders if touched
+        const openLimits = st.orders.filter(
+          (o) => o.sym === symbol && o.type === "LIMIT" && o.status === "OPEN" && o.limitPrice != null
+        );
+        if (!openLimits.length) return;
+
+        const fills: Array<{ id: string; price: number; sym: SymbolName; side: Side; lots: number }> = [];
+
+        for (const o of openLimits) {
+          const lp = o.limitPrice!;
+          if (shouldFillLimit(o.side, lp, tick, spread)) {
+            fills.push({ id: o.id, price: lp, sym: o.sym, side: o.side, lots: o.lots });
           }
         }
 
-        orders = orders.map((x) => (x.id === o.id ? filledOrder : x));
-        events = [{ type: "ORDER_FILLED", order: filledOrder, position: nextPos }, ...events].slice(0, 200);
-      }
+        if (!fills.length) return;
+
+        set((prev) => {
+          // update orders -> mark them FILLED
+          const nextOrders = prev.orders.map((o) => {
+            const f = fills.find((x) => x.id === o.id);
+            if (!f) return o;
+            return { ...o, status: "FILLED" as const, price: f.price };
+          });
+
+          // apply fills to positions
+          let nextPositions = prev.positions;
+          for (const f of fills) {
+            nextPositions = applyFillToPositions(nextPositions, {
+              sym: f.sym,
+              side: f.side,
+              lots: f.lots,
+              price: f.price,
+              last: tick.last,
+            });
+          }
+
+          return { orders: nextOrders, positions: nextPositions };
+        });
+      },
+
+      /** ✅ useTradeEngine.ts sẽ gọi onTick(...) */
+      onTick: (symbol, tick, spread) => {
+        // gọi chung 1 đường: update mark + fill limit
+        get().processTick(symbol, tick, spread ?? null);
+      },
+    }),
+    {
+      name: "hts_trade_store_v1",
+      version: 1,
+      partialize: (st) => ({
+        orders: st.orders,
+        positions: st.positions,
+      }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
+  )
+);
 
-    // update P/L
-    positions = positions.map((p) => {
-      if (p.symbol !== symbol) return p;
-      const lastMark = markPriceFromTick(tick, spread, p.side === "BUY" ? "SELL" : "BUY");
-      const u = computeUnrealized(p.symbol, p.side, p.lots, p.entry, lastMark);
-      return { ...p, last: lastMark, unrealizedPnl: u, lastUpdateTs: Date.now() };
-    });
+/** Adapter: shape mà trading.tsx đang dùng: r.order.side/type/lots + filledPrice/limitPrice */
+function toEngineOrder(o: SavedOrder): EngineOrder {
+  return {
+    id: o.id,
+    symbol: o.sym,
+    side: o.side,
+    type: o.type,
+    lots: o.lots,
+    comment: o.comment,
 
-    set({ orders, positions, events });
-  },
-}));
+    filledPrice: o.status === "FILLED" ? o.price : undefined,
+    limitPrice: o.type === "LIMIT" ? o.limitPrice : undefined,
+
+    slPrice: o.slPrice ?? null,
+    tpPrice: o.tpPrice ?? null,
+
+    status: o.status,
+  };
+}

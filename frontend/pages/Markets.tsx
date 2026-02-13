@@ -152,6 +152,22 @@ type EconRow = { t: number; impact: "HIGH" | "MED" | "LOW"; title: string; prev:
 type SparkPoint = { t: number; v: number };
 type NewsRow = { id: string; t: string; title: string; s: SymbolName | "ALL"; sentiment: "BULL" | "BEAR" | "NEUTRAL" };
 
+// ✅ Order Queue
+type OrderSide = "BUY" | "SELL";
+type OrderType = "MARKET" | "LIMIT";
+type QueuedOrder = {
+  id: string;
+  ts: number;
+  symbol: SymbolName;
+  side: OrderSide;
+  type: OrderType;
+  lots: number;
+  price?: number; // LIMIT only
+  slPips?: number;
+  tpPips?: number;
+  comment?: string;
+};
+
 /* ===================== Page ===================== */
 
 export default function MarketsPage() {
@@ -173,16 +189,16 @@ export default function MarketsPage() {
   const chg = tick?.chgPct ?? 0;
 
   const LS_FAV_KEY = "hts_favorites_v1";
+  const LS_ORDERS_KEY = "hts_order_queue_v1";
+
   const [favorites, setFavorites] = useState<SymbolName[]>([]);
   const cardBg = "linear-gradient(180deg, rgba(18,18,18,0.78), rgba(18,18,18,0.62))";
 
   // deterministic random
   const randRef = useRef<(() => number) | null>(null);
-
   if (!randRef.current) {
     randRef.current = mulberry32(24680);
   }
-
   const rnd = (a: number, b: number) => {
     const r = randRef.current!;
     return a + r() * (b - a);
@@ -270,6 +286,119 @@ export default function MarketsPage() {
 
     return () => clearInterval(id);
   }, [mounted]);
+
+  /* ===================== Order Queue (multi-orders) ===================== */
+
+  const [orderSide, setOrderSide] = useState<OrderSide>("BUY");
+  const [orderType, setOrderType] = useState<OrderType>("MARKET");
+  const [orderLots, setOrderLots] = useState("0.01");
+  const [orderLimitPrice, setOrderLimitPrice] = useState("");
+  const [orderSLPips, setOrderSLPips] = useState("");
+  const [orderTPPips, setOrderTPPips] = useState("");
+  const [orderComment, setOrderComment] = useState("");
+
+  const [orderQueue, setOrderQueue] = useState<QueuedOrder[]>([]);
+
+  const safeNum = (s: string) => {
+    const n = Number(String(s).replace(",", "."));
+    return Number.isFinite(n) ? n : NaN;
+  };
+
+  const newId = () => `${Date.now()}_${Math.floor(Math.random() * 1e9)}`;
+
+  const symbolMid = (s: SymbolName) => {
+    const w = watch.find((x) => x.s === s);
+    if (!w) return NaN;
+    return (w.bid + w.ask) / 2;
+  };
+
+  const addToQueue = () => {
+    const lots = safeNum(orderLots);
+    if (!Number.isFinite(lots) || lots <= 0) {
+      notifications.show({ title: "Order", message: "Lots không hợp lệ.", color: "red" });
+      return;
+    }
+
+    let price: number | undefined = undefined;
+    if (orderType === "LIMIT") {
+      const p = safeNum(orderLimitPrice);
+      if (!Number.isFinite(p) || p <= 0) {
+        notifications.show({ title: "Order", message: "Limit price không hợp lệ.", color: "red" });
+        return;
+      }
+      price = p;
+    }
+
+    const sl = orderSLPips.trim() ? safeNum(orderSLPips) : undefined;
+    const tp = orderTPPips.trim() ? safeNum(orderTPPips) : undefined;
+
+    if (sl !== undefined && (!Number.isFinite(sl) || sl < 0)) {
+      notifications.show({ title: "Order", message: "SL (pips) không hợp lệ.", color: "red" });
+      return;
+    }
+    if (tp !== undefined && (!Number.isFinite(tp) || tp < 0)) {
+      notifications.show({ title: "Order", message: "TP (pips) không hợp lệ.", color: "red" });
+      return;
+    }
+
+    const ord: QueuedOrder = {
+      id: newId(),
+      ts: Date.now(),
+      symbol,
+      side: orderSide,
+      type: orderType,
+      lots,
+      price,
+      slPips: sl,
+      tpPips: tp,
+      comment: orderComment?.trim() || undefined,
+    };
+
+    setOrderQueue((prev) => [ord, ...prev].slice(0, 200));
+    notifications.show({
+      title: "Order saved",
+      message: `${ord.symbol} ${ord.side} ${ord.type} lots=${ord.lots}${ord.price ? ` @${ord.price}` : ""}`,
+    });
+  };
+
+  const removeFromQueue = (id: string) => setOrderQueue((prev) => prev.filter((x) => x.id !== id));
+  const clearQueue = () => setOrderQueue([]);
+
+  const sendAllMock = () => {
+    if (!orderQueue.length) {
+      notifications.show({ title: "Order", message: "Queue đang trống.", color: "gray" });
+      return;
+    }
+    notifications.show({
+      title: "Send orders (mock)",
+      message: `Đã gửi ${orderQueue.length} lệnh (demo).`,
+      color: "green",
+    });
+    setOrderQueue([]);
+  };
+
+  // Load / Save queue to LocalStorage
+  useEffect(() => {
+    if (!mounted) return;
+    try {
+      const raw = localStorage.getItem(LS_ORDERS_KEY);
+      const arr = raw ? (JSON.parse(raw) as QueuedOrder[]) : [];
+      const cleaned = Array.isArray(arr) ? arr.filter((o) => o && symbols.includes(o.symbol)) : [];
+      setOrderQueue(cleaned);
+    } catch {
+      setOrderQueue([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    try {
+      localStorage.setItem(LS_ORDERS_KEY, JSON.stringify(orderQueue));
+    } catch {
+      // ignore
+    }
+  }, [mounted, orderQueue]);
 
   /* ===================== Sparklines ===================== */
 
@@ -630,8 +759,9 @@ export default function MarketsPage() {
                 variant="light"
                 leftSection={<IconStar size={14} />}
                 onClick={() => {
+                  const wasFav = isFav(symbol);
                   toggleFav(symbol);
-                  notifications.show({ title: "Favorites", message: `${symbol} ${isFav(symbol) ? "unpinned" : "pinned"}` });
+                  notifications.show({ title: "Favorites", message: `${symbol} ${wasFav ? "unpinned" : "pinned"}` });
                 }}
               >
                 {isFav(symbol) ? "Unpin" : "Pin"}
@@ -809,7 +939,6 @@ export default function MarketsPage() {
               <Table.Th style={{ cursor: "pointer", textAlign: "right" }} onClick={() => toggleSort("vol")}>
                 Vol{sortMark("vol")}
               </Table.Th>
-              {/* ✅ FIX: header uses TH, no w */}
               <Table.Th style={{ textAlign: "right" }}>Fav</Table.Th>
               <Table.Th style={{ textAlign: "right" }}>Action</Table.Th>
             </Table.Tr>
@@ -922,7 +1051,6 @@ export default function MarketsPage() {
                     </Badge>
                   </Table.Td>
 
-                  {/* ✅ FIX: favorite icon belongs in TBODY, has w */}
                   <Table.Td style={{ textAlign: "right" }}>
                     <ActionIcon
                       variant="subtle"
@@ -963,6 +1091,193 @@ export default function MarketsPage() {
         <Text size="xs" c="dimmed" mt="sm">
           Spread filter is normalized so FX / Gold / JPY can share a single slider.
         </Text>
+      </MotionCard>
+
+      {/* ✅ Order Queue (Save many orders) */}
+      <MotionCard
+        withBorder
+        radius="lg"
+        p="md"
+        variants={cardAnim}
+        initial="hidden"
+        animate="show"
+        style={{ background: cardBg }}
+      >
+        <Group justify="space-between" mb="xs">
+          <Group gap="xs">
+            <Text fw={700}>Order Queue</Text>
+            <Badge variant="light">{orderQueue.length} orders</Badge>
+            <Badge variant="light" color="gray">LocalStorage</Badge>
+          </Group>
+
+          <Group gap="xs">
+            <Button size="xs" variant="light" onClick={clearQueue}>
+              Clear
+            </Button>
+            <Button size="xs" color="green" onClick={sendAllMock}>
+              Send all (mock)
+            </Button>
+          </Group>
+        </Group>
+
+        <SimpleGrid cols={{ base: 1, md: 2, lg: 3 }} spacing="md">
+          <div>
+            <Text size="sm" c="dimmed" mb={6}>Side</Text>
+            <SegmentedControl
+              value={orderSide}
+              onChange={(v) => setOrderSide(v as OrderSide)}
+              data={[
+                { value: "BUY", label: "BUY" },
+                { value: "SELL", label: "SELL" },
+              ]}
+            />
+          </div>
+
+          <div>
+            <Text size="sm" c="dimmed" mb={6}>Type</Text>
+            <SegmentedControl
+              value={orderType}
+              onChange={(v) => setOrderType(v as OrderType)}
+              data={[
+                { value: "MARKET", label: "Market" },
+                { value: "LIMIT", label: "Limit" },
+              ]}
+            />
+          </div>
+
+          <div>
+            <Text size="sm" c="dimmed" mb={6}>Lots</Text>
+            <TextInput
+              value={orderLots}
+              onChange={(e) => setOrderLots(e.currentTarget.value)}
+              placeholder="0.01"
+              styles={{ input: { background: "rgba(255,255,255,0.04)" } }}
+            />
+          </div>
+
+          <div>
+            <Text size="sm" c="dimmed" mb={6}>
+              Limit price {orderType === "LIMIT" ? "" : "(disabled)"}
+            </Text>
+            <TextInput
+              value={orderLimitPrice}
+              onChange={(e) => setOrderLimitPrice(e.currentTarget.value)}
+              placeholder={mounted ? `${fmtPrice(symbol, (symbolMid(symbol) || last) as number)}` : "--"}
+              disabled={orderType !== "LIMIT"}
+              styles={{ input: { background: "rgba(255,255,255,0.04)" } }}
+            />
+          </div>
+
+          <div>
+            <Text size="sm" c="dimmed" mb={6}>SL (pips)</Text>
+            <TextInput
+              value={orderSLPips}
+              onChange={(e) => setOrderSLPips(e.currentTarget.value)}
+              placeholder="e.g. 30"
+              styles={{ input: { background: "rgba(255,255,255,0.04)" } }}
+            />
+          </div>
+
+          <div>
+            <Text size="sm" c="dimmed" mb={6}>TP (pips)</Text>
+            <TextInput
+              value={orderTPPips}
+              onChange={(e) => setOrderTPPips(e.currentTarget.value)}
+              placeholder="e.g. 60"
+              styles={{ input: { background: "rgba(255,255,255,0.04)" } }}
+            />
+          </div>
+
+          <div style={{ gridColumn: "span 2" as any }}>
+            <Text size="sm" c="dimmed" mb={6}>Comment</Text>
+            <TextInput
+              value={orderComment}
+              onChange={(e) => setOrderComment(e.currentTarget.value)}
+              placeholder="Breakout / Reversal / News..."
+              styles={{ input: { background: "rgba(255,255,255,0.04)" } }}
+            />
+          </div>
+
+          <div style={{ display: "grid", alignContent: "end" }}>
+            <Button onClick={addToQueue}>
+              Save Order ({symbol})
+            </Button>
+            <Text size="xs" c="dimmed" mt={6}>
+              Tip: chọn symbol ở Screener/Heatmap rồi Save.
+            </Text>
+          </div>
+        </SimpleGrid>
+
+        <Divider my="sm" />
+
+        <Table highlightOnHover>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Time</Table.Th>
+              <Table.Th>Symbol</Table.Th>
+              <Table.Th>Side</Table.Th>
+              <Table.Th>Type</Table.Th>
+              <Table.Th>Lots</Table.Th>
+              <Table.Th>Price</Table.Th>
+              <Table.Th>SL/TP</Table.Th>
+              <Table.Th>Comment</Table.Th>
+              <Table.Th style={{ textAlign: "right" }}>Action</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+
+          <Table.Tbody>
+            {orderQueue.length ? (
+              orderQueue.map((o) => (
+                <Table.Tr key={o.id}>
+                  <Table.Td>
+                    <Text size="xs" c="dimmed">
+                      {new Date(o.ts).toLocaleTimeString()}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td><Text fw={800}>{o.symbol}</Text></Table.Td>
+                  <Table.Td>
+                    <Badge variant="light" color={o.side === "BUY" ? "green" : "red"}>
+                      {o.side}
+                    </Badge>
+                  </Table.Td>
+                  <Table.Td><Badge variant="light">{o.type}</Badge></Table.Td>
+                  <Table.Td>{o.lots}</Table.Td>
+                  <Table.Td>
+                    {o.type === "LIMIT" && o.price ? (
+                      <Badge variant="light">{fmtPrice(o.symbol, o.price)}</Badge>
+                    ) : (
+                      <Text size="sm" c="dimmed">MKT</Text>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">
+                      {o.slPips !== undefined ? `SL ${o.slPips}` : "SL —"} •{" "}
+                      {o.tpPips !== undefined ? `TP ${o.tpPips}` : "TP —"}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm" c="dimmed">
+                      {o.comment ?? "--"}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td style={{ textAlign: "right" }}>
+                    <Button size="xs" variant="light" color="red" onClick={() => removeFromQueue(o.id)}>
+                      Remove
+                    </Button>
+                  </Table.Td>
+                </Table.Tr>
+              ))
+            ) : (
+              <Table.Tr>
+                <Table.Td colSpan={9}>
+                  <Text c="dimmed" size="sm">
+                    Queue trống. Hãy chọn symbol → Save Order.
+                  </Text>
+                </Table.Td>
+              </Table.Tr>
+            )}
+          </Table.Tbody>
+        </Table>
       </MotionCard>
 
       {/* Heatmap + Movers + Calendar */}

@@ -6,10 +6,14 @@ import { useTradeStore } from "@/lib/tradeStore";
 import { formatPrice } from "@/lib/symbolSpecs";
 
 export default function PositionsTable() {
-  const positions = useTradeStore((s) => s.positions);
+  // positions hiện tại là object Record => phải convert
+  const positionsMap = useTradeStore((s) => s.positions);
   const closePosition = useTradeStore((s) => s.closePosition);
 
-  const rows = useMemo(() => positions, [positions]);
+  const rows = useMemo(() => {
+    // Object.values trả về (Position | undefined)[]
+    return Object.values(positionsMap).filter(Boolean) as any[];
+  }, [positionsMap]);
 
   return (
     <>
@@ -35,7 +39,8 @@ export default function PositionsTable() {
 
         <Table.Tbody>
           {rows.map((p) => (
-            <Table.Tr key={p.id}>
+            // ✅ positions dạng Record => key dùng symbol (unique per symbol)
+            <Table.Tr key={p.symbol}>
               <Table.Td fw={800}>{p.symbol}</Table.Td>
 
               <Table.Td>
@@ -44,22 +49,30 @@ export default function PositionsTable() {
                 </Badge>
               </Table.Td>
 
-              <Table.Td ta="right">{p.lots.toFixed(2)}</Table.Td>
+              <Table.Td ta="right">{Number(p.lots).toFixed(2)}</Table.Td>
 
               <Table.Td ta="right" c="dimmed">
                 {formatPrice(p.symbol, p.entry)}
               </Table.Td>
 
+              {/* ✅ GIỮ NGUYÊN Price = p.last */}
               <Table.Td ta="right" c="dimmed">
                 {formatPrice(p.symbol, p.last)}
               </Table.Td>
 
+              {/* ✅ GIỮ NGUYÊN P/L = p.unrealizedPnl */}
               <Table.Td ta="right" fw={800} c={p.unrealizedPnl >= 0 ? "green" : "red"}>
                 {p.unrealizedPnl >= 0 ? "+" : "-"}${Math.abs(p.unrealizedPnl).toFixed(2)}
               </Table.Td>
 
               <Table.Td ta="right">
-                <Button size="xs" variant="light" color="gray" onClick={() => closePosition(p.id)}>
+                <Button
+                  size="xs"
+                  variant="light"
+                  color="gray"
+                  // ✅ close theo symbol (vì store đang là Record by symbol)
+                  onClick={() => closePosition(p.symbol)}
+                >
                   Close
                 </Button>
               </Table.Td>

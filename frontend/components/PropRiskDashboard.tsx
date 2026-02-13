@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Divider } from "@mantine/core";
 import { PieChart, Pie, Cell } from "recharts";
 import { RingProgress } from "@mantine/core";
-
+import Image from "next/image";
+// import { Group, Text } from "@mantine/core";
 import {
   Badge,
   Button,
@@ -566,16 +567,20 @@ const rnd = (a: number, b: number) => a + rand() * (b - a);
             <Badge variant="light">Realtime mock</Badge>
           </Group>
 
-          <div style={{ height: 260 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={equityCurveLive} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                <XAxis dataKey="t" />
-                <YAxis />
-                <Tooltip />
-                <Area type="monotone" dataKey="v" strokeWidth={2} fillOpacity={0.15} />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div style={{ height: 260, minHeight: 260, width: "100%", minWidth: 0 }}>
+            {mounted ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={equityCurveLive} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                  <XAxis dataKey="t" />
+                  <YAxis />
+                  <Tooltip />
+                  <Area type="monotone" dataKey="v" strokeWidth={2} fillOpacity={0.15} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ height: "100%" }} />
+            )}
           </div>
 
           <Group mt="md" justify="space-between">
@@ -654,16 +659,27 @@ const rnd = (a: number, b: number) => a + rand() * (b - a);
             <Badge variant="light">Realtime mock</Badge>
           </Group>
 
-          <div style={{ height: 300 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dailyPnLLive} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                <XAxis dataKey="t" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="p" fill={pnlBarFill} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div style={{ height: 300, minHeight: 300, width: "100%", minWidth: 0 }}>
+            {mounted ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={dailyPnLLive} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                  <XAxis dataKey="t" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="p">
+                    {dailyPnLLive.map((x, i) => (
+                      <Cell
+                        key={i}
+                        fill={x.p >= 0 ? "rgba(16,185,129,0.9)" : "rgba(239,68,68,0.9)"}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ height: "100%" }} />
+            )}
           </div>
 
           <Group mt="md" justify="space-between">

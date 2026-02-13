@@ -2,17 +2,18 @@
 "use client";
 
 import { useEffect } from "react";
-import type { SymbolName, Tick } from "./tradeTypes";
-import { useTradeStore } from "./tradeStore";
+import type { SymbolName } from "@/lib/fakeFeed";
+import type { TickLike } from "@/lib/tradeStore";
+import { useTradeStore } from "@/lib/tradeStore";
 
 /**
- * Push ticks từ feed -> OMS demo store
+ * Push ticks từ feed -> store
  * - fill LIMIT pending
- * - update unrealized P/L
+ * - update last & unrealized P/L
  */
 export function useTradeEngine(
   symbol: SymbolName,
-  tick: Tick | null | undefined,
+  tick: TickLike | null | undefined,
   spread?: number | null
 ) {
   const onTick = useTradeStore((s) => s.onTick);
