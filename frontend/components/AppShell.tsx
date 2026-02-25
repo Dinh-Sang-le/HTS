@@ -1,14 +1,28 @@
+// components/AppShell.tsx
 "use client";
 
 import React, { useState } from "react";
 import { AppShell, Group, Text, Box } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
+
 import { SideNav } from "@/components/SideNav";
 import { TopBar } from "@/components/TopBar";
 import { BrandLogo } from "@/components/BrandLogo";
+import { useI18n } from "@/lib/i18nProvider";
 
-export function HTSAppShell({ children }: { children: React.ReactNode }) {
-  const [opened] = useDisclosure();
+export function HTSAppShell({
+  children,
+  colorScheme,
+  toggleColorScheme,
+}: {
+  children: React.ReactNode;
+  colorScheme: "dark" | "light";
+  toggleColorScheme: () => void;
+}) {
+  const { t } = useI18n();
+
+  const [opened] = useDisclosure(); // giữ y logic cũ của bạn
+  const isDark = colorScheme === "dark";
 
   // ✅ mỗi lần hover -> tăng "mực hồng" dâng lên (tích lũy)
   const [rise, setRise] = useState(0); // 0..10
@@ -21,17 +35,15 @@ export function HTSAppShell({ children }: { children: React.ReactNode }) {
       padding="md"
       styles={{
         header: {
-          background: "rgba(245,245,245,0.08)",
-          backdropFilter: "blur(10px)",
-          borderBottom: "1px solid rgba(255,255,255,0.10)",
-        },
-        main: {
-          background:
-            "radial-gradient(1200px 600px at 20% 0%, rgba(59,130,246,0.10), transparent 55%), rgba(16,16,16,1)",
+          background: "var(--mantine-color-body)",
+          borderBottom: "1px solid var(--mantine-color-default-border)",
         },
         navbar: {
-          background: "rgba(18,18,18,0.92)",
-          borderRight: "1px solid rgba(255,255,255,0.08)",
+          background: "var(--mantine-color-body)",
+          borderRight: "1px solid var(--mantine-color-default-border)",
+        },
+        main: {
+          background: "var(--mantine-color-body)",
         },
       }}
     >
@@ -52,8 +64,6 @@ export function HTSAppShell({ children }: { children: React.ReactNode }) {
                 alignItems: "center",
                 padding: "0 10px",
                 borderRadius: 12,
-                
-                
                 overflow: "hidden",
                 cursor: "pointer",
               }}
@@ -67,10 +77,9 @@ export function HTSAppShell({ children }: { children: React.ReactNode }) {
                   alignItems: "center",
                   padding: "0 12px",
                   borderRadius: 10,
-                  // ✅ FIX: bỏ border inline (inner không có border nữa)
-                  // border: "1px solid rgba(255,255,255,0.04)",
-                  background:
-                    "linear-gradient(180deg, rgba(10,10,10,0.22), rgba(10,10,10,0.10))",
+                  background: isDark
+                    ? "linear-gradient(180deg, rgba(10,10,10,0.22), rgba(10,10,10,0.10))"
+                    : "linear-gradient(180deg, rgba(255,255,255,0.75), rgba(255,255,255,0.35))",
                   backdropFilter: "blur(10px)",
                   overflow: "hidden",
                 }}
@@ -94,33 +103,22 @@ export function HTSAppShell({ children }: { children: React.ReactNode }) {
               </div>
             </Box>
 
-            <Text
-              size="sm"
-              fw={600}
-              style={{
-                whiteSpace: "nowrap",
-                letterSpacing: "0.4px",
-                background: "linear-gradient(90deg, #ffffff, #9ecbff)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                opacity: 0.9,
-                textShadow: "0 0 10px rgba(59,130,246,0.35)",
-              }}
-            >
-              Home Trading System
+            {/* ✅ Bạn muốn label này đổi theo ngôn ngữ thì map vào i18n */}
+            <Text size="sm" fw={1000} className="hts-brand-text">
+              {t("Home Trading System") ?? "Home Trading System"}
             </Text>
           </Group>
 
-          <div style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
-            <TopBar />
-          </div>
+          {/* Right side */}
+          <Group gap="sm" style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
+              <TopBar colorScheme={colorScheme} toggleColorScheme={toggleColorScheme} />
+            </div>
+          </Group>
         </Group>
 
-        {/* ✅ CSS global */}
+        {/* ✅ CSS global (giữ y nguyên) */}
         <style jsx global>{`
-
-        
-
           /* map rise 0..10 -> 0..22px */
           .hts-logoPlate[data-rise="0"] { --risePx: 0px; }
           .hts-logoPlate[data-rise="1"] { --risePx: 3px; }

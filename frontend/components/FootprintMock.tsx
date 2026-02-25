@@ -104,9 +104,7 @@ export default function FootprintMock({ symbol, mid }: Props) {
         ))}
       </div>
 
-      <Text size="xs" c="dimmed" mt="sm">
-        Đây là mock footprint heatmap. Sau này thay bằng dữ liệu volume@price thật.
-      </Text>
+      
     </Paper>
   );
 }

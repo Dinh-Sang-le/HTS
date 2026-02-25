@@ -5,7 +5,7 @@ import {
   createChart,
   CandlestickSeries,
   type IChartApi,
-  type ISeriesApi,
+  type Time,
 } from "lightweight-charts";
 import { Box, Group, Badge, Text, Button } from "@mantine/core";
 import { IconZoomIn, IconZoomOut, IconRefresh } from "@tabler/icons-react";
@@ -18,24 +18,36 @@ type Props = {
   symbol: SymbolName;
   candles: Candle[];
   rightBadges?: React.ReactNode;
+
+  /** Net position (cũ) - giữ để UI khác không vỡ */
   position?: Position | null;
+
+  /** ✅ list positions (hedging) */
+  positions?: Position[];
+
+  /** ✅ NEW (optional): nếu truyền từ AppShell/page thì chart đổi theme chuẩn hơn */
+  colorScheme?: "dark" | "light";
 };
 
-type Marker = {
-  time: any;
-  position: "aboveBar" | "belowBar" | "inBar";
-  color: string;
-  shape: "arrowUp" | "arrowDown" | "circle" | "square";
-  text?: string;
-};
+function getDomScheme(): "dark" | "light" {
+  if (typeof document === "undefined") return "dark";
+  const v = document.documentElement.getAttribute("data-mantine-color-scheme");
+  return v === "light" ? "light" : "dark";
+}
 
-export default function TradingChart({ symbol, candles, rightBadges, position }: Props) {
+export default function TradingChart({
+  symbol,
+  candles,
+  rightBadges,
+  position,
+  positions,
+  colorScheme,
+}: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const seriesRef = useRef<any>(null);
 
   const priceLinesRef = useRef<any[]>([]);
-  const markerKeyRef = useRef<string>("");
 
   const [ready, setReady] = useState(false);
 
@@ -48,20 +60,95 @@ export default function TradingChart({ symbol, candles, rightBadges, position }:
   // for symbol switch: allow 1-time fit
   const lastSymbolRef = useRef<string>("");
 
-  const dp = useMemo(() => (symbol === "XAUUSD" || symbol === "USDJPY" ? 2 : 4), [symbol]);
+  // fallback scheme (nếu không truyền colorScheme)
+  const [domScheme, setDomScheme] = useState<"dark" | "light">(() =>
+    getDomScheme()
+  );
+  const scheme = colorScheme ?? domScheme;
+  const isDark = scheme === "dark";
 
-  // ===== marker compatibility wrapper (no crash)
-  const setSeriesMarkersSafe = (markers: Marker[]) => {
-    const s: any = seriesRef.current as any;
-    if (!s) return;
-    if (typeof s.setMarkers === "function") {
-      s.setMarkers(markers);
-      return;
+  // listen DOM scheme changes only when colorScheme prop is not provided
+  useEffect(() => {
+    if (colorScheme) return;
+    const el = document.documentElement;
+    const obs = new MutationObserver(() => setDomScheme(getDomScheme()));
+    obs.observe(el, {
+      attributes: true,
+      attributeFilter: ["data-mantine-color-scheme"],
+    });
+    return () => obs.disconnect();
+  }, [colorScheme]);
+
+  const dp = useMemo(
+    () => (symbol === "XAUUSD" || symbol === "USDJPY" ? 2 : 4),
+    [symbol]
+  );
+
+  // ===== THEME OPTIONS (NEW) =====
+  const themeOptions = useMemo(() => {
+    if (isDark) {
+      return {
+        layout: {
+          background: { type: "solid" as const, color: "transparent" }, // giữ cảm giác cũ
+          textColor: "rgba(255,255,255,0.82)",
+          fontSize: 12,
+        },
+        grid: {
+          vertLines: { color: "rgba(255,255,255,0.06)" },
+          horzLines: { color: "rgba(255,255,255,0.06)" },
+        },
+        rightPriceScale: {
+          borderColor: "rgba(255,255,255,0.10)",
+          scaleMargins: { top: 0.12, bottom: 0.12 },
+        },
+        timeScale: {
+          borderColor: "rgba(255,255,255,0.10)",
+          timeVisible: true,
+          secondsVisible: false,
+          rightOffset: 8,
+          barSpacing: 14,
+          fixLeftEdge: true,
+          fixRightEdge: false,
+        },
+        crosshair: {
+          vertLine: { color: "rgba(59,130,246,0.35)" },
+          horzLine: { color: "rgba(59,130,246,0.35)" },
+        },
+      };
     }
-    // older/newer versions without markers => ignore (still show price lines)
-  };
 
-  // ===== init chart
+    // ☀ LIGHT MODE: nền trắng + grid xám nhẹ + text #4f9078
+    return {
+      layout: {
+        background: { type: "solid" as const, color: "#ffffff" },
+        textColor: "rgba(79,144,120,0.92)", // #4f9078
+        fontSize: 12,
+      },
+      grid: {
+        vertLines: { color: "rgba(0,0,0,0.07)" },
+        horzLines: { color: "rgba(0,0,0,0.07)" },
+      },
+      rightPriceScale: {
+        borderColor: "rgba(0,0,0,0.10)",
+        scaleMargins: { top: 0.12, bottom: 0.12 },
+      },
+      timeScale: {
+        borderColor: "rgba(0,0,0,0.10)",
+        timeVisible: true,
+        secondsVisible: false,
+        rightOffset: 8,
+        barSpacing: 14,
+        fixLeftEdge: true,
+        fixRightEdge: false,
+      },
+      crosshair: {
+        vertLine: { color: "rgba(0,0,0,0.18)" },
+        horzLine: { color: "rgba(0,0,0,0.18)" },
+      },
+    };
+  }, [isDark]);
+
+  // ===== init chart (GIỮ LOGIC CŨ, chỉ thay options theo theme) =====
   useEffect(() => {
     if (!ref.current) return;
     const el = ref.current;
@@ -69,32 +156,7 @@ export default function TradingChart({ symbol, candles, rightBadges, position }:
     const chart = createChart(el, {
       width: el.clientWidth,
       height: el.clientHeight,
-      layout: {
-        background: { color: "transparent" },
-        textColor: "rgba(255,255,255,0.82)",
-        fontSize: 12,
-      },
-      grid: {
-        vertLines: { color: "rgba(255,255,255,0.06)" },
-        horzLines: { color: "rgba(255,255,255,0.06)" },
-      },
-      rightPriceScale: {
-        borderColor: "rgba(255,255,255,0.10)",
-        scaleMargins: { top: 0.12, bottom: 0.12 },
-      },
-      timeScale: {
-        borderColor: "rgba(255,255,255,0.10)",
-        timeVisible: true,
-        secondsVisible: false,
-        rightOffset: 8,
-        barSpacing: 14, // ✅ mặc định rõ hơn
-        fixLeftEdge: true,
-        fixRightEdge: false, // ✅ cho phép user pan/zoom mà không bị kéo về
-      },
-      crosshair: {
-        vertLine: { color: "rgba(59,130,246,0.35)" },
-        horzLine: { color: "rgba(59,130,246,0.35)" },
-      },
+      ...themeOptions,
       handleScroll: {
         mouseWheel: true,
         pressedMouseMove: true,
@@ -108,10 +170,13 @@ export default function TradingChart({ symbol, candles, rightBadges, position }:
       },
     });
 
-    // add series
-    let series: any = null;
-    const anyChart = chart as any;
+    chartRef.current = chart;
 
+    // series (GIỮ CŨ)
+    const anyChart = chart as any;
+    let series: any = null;
+
+    // prefer addCandlestickSeries if available (stable)
     if (typeof anyChart.addCandlestickSeries === "function") {
       series = anyChart.addCandlestickSeries({
         upColor: "#10b981",
@@ -130,7 +195,6 @@ export default function TradingChart({ symbol, candles, rightBadges, position }:
       });
     }
 
-    chartRef.current = chart;
     seriesRef.current = series;
     setReady(true);
 
@@ -142,11 +206,14 @@ export default function TradingChart({ symbol, candles, rightBadges, position }:
 
     const ro = new ResizeObserver(() => {
       if (!ref.current) return;
-      chart.applyOptions({ width: ref.current.clientWidth, height: ref.current.clientHeight });
+      chart.applyOptions({
+        width: ref.current.clientWidth,
+        height: ref.current.clientHeight,
+      });
     });
     ro.observe(el);
 
-    // ✅ wheel zoom stronger + doesn’t reset
+    // wheel zoom stronger + doesn’t reset (GIỮ CŨ)
     const wheel = (ev: WheelEvent) => {
       if (!ref.current) return;
       if (!ref.current.contains(ev.target as Node)) return;
@@ -154,14 +221,14 @@ export default function TradingChart({ symbol, candles, rightBadges, position }:
       ev.preventDefault();
       userInteractedRef.current = true;
 
-      const ts = chart.timeScale();
-      const cur = ts.options().barSpacing ?? 14;
+      const ts2 = chart.timeScale();
+      const cur = ts2.options().barSpacing ?? 14;
 
       const direction = ev.deltaY < 0 ? 1 : -1;
-      const step = ev.ctrlKey ? 6 : 3; // ✅ mạnh hơn nhiều
+      const step = ev.ctrlKey ? 6 : 3;
 
       const next = Math.max(2, Math.min(140, cur + direction * step));
-      ts.applyOptions({ barSpacing: next });
+      ts2.applyOptions({ barSpacing: next });
     };
 
     el.addEventListener("wheel", wheel, { passive: false });
@@ -169,18 +236,37 @@ export default function TradingChart({ symbol, candles, rightBadges, position }:
     return () => {
       el.removeEventListener("wheel", wheel as any);
       ro.disconnect();
-      // @ts-ignore older versions may not return unsubscribe
+      // @ts-ignore
       unsub?.();
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
       setReady(false);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ===== set/update candles WITHOUT resetting zoom
+  // ===== apply theme when scheme changes (NEW) =====
   useEffect(() => {
-    const series = seriesRef.current as any;
+    const chart = chartRef.current;
+    if (!chart) return;
+
+    // giữ barSpacing hiện tại (đỡ “nhảy” khi đổi theme)
+    const ts = chart.timeScale();
+    const curSpacing = ts.options().barSpacing ?? 14;
+
+    chart.applyOptions({
+      ...themeOptions,
+      timeScale: {
+        ...(themeOptions as any).timeScale,
+        barSpacing: curSpacing,
+      },
+    });
+  }, [themeOptions]);
+
+  // ===== set/update candles WITHOUT resetting zoom (GIỮ CŨ) =====
+  useEffect(() => {
+    const series: any = seriesRef.current;
     const chart = chartRef.current;
     if (!series || !chart) return;
 
@@ -195,23 +281,20 @@ export default function TradingChart({ symbol, candles, rightBadges, position }:
     const isSymbolChanged = lastSymbolRef.current !== symbol;
     if (isSymbolChanged) {
       lastSymbolRef.current = symbol;
-      userInteractedRef.current = false; // allow 1-time fit on new symbol
+      userInteractedRef.current = false;
       lastTimeRef.current = null;
     }
 
-    // If no previous candle => setData + fitContent (only once per symbol)
     if (lastTimeRef.current == null || data.length < 2) {
       series.setData(data);
       lastTimeRef.current = data[data.length - 1]?.time ?? null;
 
-      // ✅ only fit when user hasn't interacted yet (fresh load/switch symbol)
       if (!userInteractedRef.current) {
         chart.timeScale().fitContent();
       }
       return;
     }
 
-    // Incremental update: update last candle if time same, else update new candle
     const last = data[data.length - 1];
     if (!last) return;
 
@@ -221,11 +304,9 @@ export default function TradingChart({ symbol, candles, rightBadges, position }:
       series.update(last);
       lastTimeRef.current = last.time;
     }
-
-    // 🚫 DO NOT fitContent here => keep zoom/pan
   }, [candles, dp, symbol]);
 
-  // ===== helpers
+  // ===== helpers (GIỮ CŨ) =====
   const clearPriceLines = () => {
     const s: any = seriesRef.current;
     if (!s) return;
@@ -237,110 +318,64 @@ export default function TradingChart({ symbol, candles, rightBadges, position }:
     priceLinesRef.current = [];
   };
 
-  // ===== draw entry/SL/TP (no reset zoom)
+  // ===== draw multiple position entry lines (short label) (GIỮ CŨ) =====
   useEffect(() => {
     const s: any = seriesRef.current;
     if (!s) return;
 
     clearPriceLines();
 
-    if (!position || position.symbol !== symbol) {
-      setSeriesMarkersSafe([]);
-      markerKeyRef.current = "";
-      return;
+    // ưu tiên positions[] (hedging). nếu không có thì fallback position (net) cũ
+    const list: any[] =
+      positions && positions.length
+        ? positions.filter((p) => p.symbol === symbol)
+        : position && position.symbol === symbol
+          ? [position]
+          : [];
+
+    if (!list.length) return;
+
+    // nếu nhiều quá thì giới hạn 6 lệnh gần nhất cho đỡ rối
+    const sorted = [...list].sort(
+      (a, b) =>
+        Number(b.openedAt ?? b.openedTs ?? 0) - Number(a.openedAt ?? a.openedTs ?? 0)
+    );
+    const show = sorted.slice(0, 6);
+
+    for (const p of show) {
+      const isBuy = p.side === "BUY";
+      const entryColor = isBuy
+        ? "rgba(16,185,129,0.95)"
+        : "rgba(239,68,68,0.95)";
+      const glowColor = isBuy
+        ? "rgba(16,185,129,0.22)"
+        : "rgba(239,68,68,0.22)";
+
+      // glow mỏng
+      const glow = s.createPriceLine({
+        price: p.entry,
+        color: glowColor,
+        lineWidth: 4,
+        lineStyle: 0,
+        axisLabelVisible: false,
+        title: "",
+      });
+
+      // label NGẮN: "BUY 0.10"
+      const entryLine = s.createPriceLine({
+        price: p.entry,
+        color: entryColor,
+        lineWidth: 2,
+        lineStyle: 0,
+        axisLabelVisible: true,
+        title: `${p.side} ${Number(p.lots).toFixed(2)}`,
+      });
+
+      priceLinesRef.current.push(glow, entryLine);
     }
+  }, [symbol, position?.id, position?.entry, position?.side, positions?.length]);
 
-    const isBuy = position.side === "BUY";
-    const entryColor = isBuy ? "rgba(16,185,129,0.95)" : "rgba(239,68,68,0.95)";
-    const glowColor = isBuy ? "rgba(16,185,129,0.35)" : "rgba(239,68,68,0.35)";
-
-    const glow = s.createPriceLine({
-      price: position.entry,
-      color: glowColor,
-      lineWidth: 6,
-      lineStyle: 0,
-      axisLabelVisible: false,
-      title: "",
-    });
-
-    const entryLine = s.createPriceLine({
-      price: position.entry,
-      color: entryColor,
-      lineWidth: 2,
-      lineStyle: 0,
-      axisLabelVisible: true,
-      title: `${position.side} @ ${formatPrice(symbol as any, position.entry)}`,
-    });
-
-    priceLinesRef.current.push(glow, entryLine);
-
-    if (position.slPrice != null) {
-      priceLinesRef.current.push(
-        s.createPriceLine({
-          price: position.slPrice,
-          color: "rgba(239,68,68,0.85)",
-          lineWidth: 2,
-          lineStyle: 2,
-          axisLabelVisible: true,
-          title: `SL ${formatPrice(symbol as any, position.slPrice)}`,
-        })
-      );
-    }
-
-    if (position.tpPrice != null) {
-      priceLinesRef.current.push(
-        s.createPriceLine({
-          price: position.tpPrice,
-          color: "rgba(16,185,129,0.85)",
-          lineWidth: 2,
-          lineStyle: 2,
-          axisLabelVisible: true,
-          title: `TP ${formatPrice(symbol as any, position.tpPrice)}`,
-        })
-      );
-    }
-
-    // marker safe (if supported)
-    const key = `${position.id}_${position.openedTs}_${position.entry}_${position.side}`;
-    if (markerKeyRef.current !== key) {
-      markerKeyRef.current = key;
-
-      const openSec = Math.floor(position.openedTs / 1000);
-
-      let nearestTime: any = candles[0]?.time as any;
-      let best = Math.abs((candles[0]?.time ?? openSec) - openSec);
-
-      for (const c of candles) {
-        const d = Math.abs((c.time as any) - openSec);
-        if (d < best) {
-          best = d;
-          nearestTime = c.time as any;
-        }
-      }
-
-      setSeriesMarkersSafe([
-        {
-          time: nearestTime,
-          position: isBuy ? "belowBar" : "aboveBar",
-          color: entryColor,
-          shape: isBuy ? "arrowUp" : "arrowDown",
-          text: `${position.side} ${position.lots.toFixed(2)} @ ${formatPrice(symbol as any, position.entry)}`,
-        },
-      ]);
-    }
-  }, [
-    symbol,
-    position?.id,
-    position?.symbol,
-    position?.side,
-    position?.entry,
-    position?.slPrice,
-    position?.tpPrice,
-    position?.openedTs,
-    candles,
-  ]);
-
-  // ===== zoom buttons (don’t reset)
+  // ===== zoom buttons (don’t reset) (GIỮ CŨ) =====
   const zoomIn = () => {
     const ch = chartRef.current;
     if (!ch) return;
@@ -367,8 +402,19 @@ export default function TradingChart({ symbol, candles, rightBadges, position }:
   };
 
   return (
-    <Box style={{ height: "100%", width: "100%", position: "relative" }}>
-      {/* top overlay */}
+    <Box
+      className="hts-chartWrap"
+      style={{
+        height: "100%",
+        width: "100%",
+        position: "relative",
+        // ✅ NEW: chống “dính nền đen” ở light mode
+        background: isDark ? "transparent" : "#ffffff",
+        borderRadius: 12,
+        overflow: "hidden",
+      }}
+    >
+      {/* top overlay (GIỮ CŨ) */}
       <Group
         justify="space-between"
         style={{
@@ -387,9 +433,14 @@ export default function TradingChart({ symbol, candles, rightBadges, position }:
             Institutional View
           </Text>
 
+          {/* giữ badge net position nếu bạn muốn */}
           {position && position.symbol === symbol ? (
-            <Badge variant="outline" color={position.side === "BUY" ? "green" : "red"}>
-              POS {position.side} {position.lots.toFixed(2)} @ {formatPrice(symbol as any, position.entry)}
+            <Badge
+              variant="outline"
+              color={position.side === "BUY" ? "green" : "red"}
+            >
+              POS {position.side} {position.lots.toFixed(2)} @{" "}
+              {formatPrice(symbol as any, position.entry)}
             </Badge>
           ) : null}
         </Group>
@@ -397,7 +448,7 @@ export default function TradingChart({ symbol, candles, rightBadges, position }:
         <Group gap="xs">{rightBadges}</Group>
       </Group>
 
-      {/* zoom controls */}
+      {/* zoom controls (GIỮ CŨ) */}
       <Group
         gap="xs"
         style={{
@@ -408,13 +459,31 @@ export default function TradingChart({ symbol, candles, rightBadges, position }:
           pointerEvents: "auto",
         }}
       >
-        <Button size="xs" variant="light" onClick={zoomOut} disabled={!ready} leftSection={<IconZoomOut size={14} />}>
+        <Button
+          size="xs"
+          variant="light"
+          onClick={zoomOut}
+          disabled={!ready}
+          leftSection={<IconZoomOut size={14} />}
+        >
           Zoom -
         </Button>
-        <Button size="xs" variant="light" onClick={zoomIn} disabled={!ready} leftSection={<IconZoomIn size={14} />}>
+        <Button
+          size="xs"
+          variant="light"
+          onClick={zoomIn}
+          disabled={!ready}
+          leftSection={<IconZoomIn size={14} />}
+        >
           Zoom +
         </Button>
-        <Button size="xs" variant="light" onClick={resetZoom} disabled={!ready} leftSection={<IconRefresh size={14} />}>
+        <Button
+          size="xs"
+          variant="light"
+          onClick={resetZoom}
+          disabled={!ready}
+          leftSection={<IconRefresh size={14} />}
+        >
           Reset
         </Button>
       </Group>

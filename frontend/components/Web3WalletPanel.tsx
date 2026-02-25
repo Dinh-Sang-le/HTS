@@ -1,3 +1,4 @@
+// components/Web3WalletPanel.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -36,6 +37,8 @@ import {
   type WatchedToken,
 } from "@/lib/web3/walletStore";
 
+import { useI18n } from "@/lib/i18nProvider";
+
 const ERC20_ABI = [
   {
     type: "function",
@@ -69,11 +72,12 @@ function isHexAddress(s: string) {
 function explorerBase(chainId: number) {
   if (chainId === sepolia.id) return "https://sepolia.etherscan.io";
   if (chainId === mainnet.id) return "https://etherscan.io";
-  // fallback
   return "https://etherscan.io";
 }
 
 export default function Web3WalletPanel() {
+  const { t } = useI18n();
+
   const { address, isConnected } = useAccount();
   const { connect, connectors, isPending: connecting } = useConnect();
   const { disconnect } = useDisconnect();
@@ -98,8 +102,8 @@ export default function Web3WalletPanel() {
     const a = tokenAddr.trim();
     if (!isHexAddress(a)) {
       notifications.show({
-        title: "Token",
-        message: "ERC20 address không hợp lệ.",
+        title: t("web3.token.title"),
+        message: t("web3.token.invalid_address"),
         color: "red",
       });
       return;
@@ -107,15 +111,15 @@ export default function Web3WalletPanel() {
     const d = Number(tokenDecimals);
     if (!Number.isFinite(d) || d < 0 || d > 36) {
       notifications.show({
-        title: "Token",
-        message: "Decimals không hợp lệ.",
+        title: t("web3.token.title"),
+        message: t("web3.token.invalid_decimals"),
         color: "red",
       });
       return;
     }
     const sym = (tokenSymbol || "TOKEN").trim().slice(0, 12);
 
-    const t: WatchedToken = {
+    const tok: WatchedToken = {
       chainId,
       address: a as `0x${string}`,
       symbol: sym,
@@ -124,12 +128,12 @@ export default function Web3WalletPanel() {
 
     setWatched((prev) => {
       const next = [
-        t,
+        tok,
         ...prev.filter(
           (x) =>
             !(
-              x.chainId === t.chainId &&
-              x.address.toLowerCase() === t.address.toLowerCase()
+              x.chainId === tok.chainId &&
+              x.address.toLowerCase() === tok.address.toLowerCase()
             )
         ),
       ];
@@ -141,9 +145,9 @@ export default function Web3WalletPanel() {
     setTokenDecimals("18");
   };
 
-  const removeToken = (t: WatchedToken) => {
+  const removeToken = (tok: WatchedToken) => {
     setWatched((prev) =>
-      prev.filter((x) => !(x.chainId === t.chainId && x.address === t.address))
+      prev.filter((x) => !(x.chainId === tok.chainId && x.address === tok.address))
     );
   };
 
@@ -154,27 +158,29 @@ export default function Web3WalletPanel() {
       ? "Sepolia"
       : `Chain ${chainId}`;
 
-  /* ===================== Deposit (Nạp) ===================== */
+  /* ===================== Deposit ===================== */
   const copyDeposit = async () => {
     if (!address) return;
     try {
       await navigator.clipboard.writeText(address);
-      notifications.show({ title: "Deposit", message: "Đã copy địa chỉ nhận." });
+      notifications.show({
+        title: t("web3.deposit.title"),
+        message: t("web3.deposit.copied"),
+      });
     } catch {
       notifications.show({
-        title: "Deposit",
-        message: "Không copy được (browser blocked).",
+        title: t("web3.deposit.title"),
+        message: t("web3.deposit.copy_failed"),
         color: "red",
       });
     }
   };
 
-  /* ===================== Withdraw Native (Rút Native) ===================== */
+  /* ===================== Withdraw Native ===================== */
   const [to, setTo] = useState("");
   const [amt, setAmt] = useState("");
 
-  const { sendTransactionAsync, isPending: sendingNative } =
-    useSendTransaction();
+  const { sendTransactionAsync, isPending: sendingNative } = useSendTransaction();
 
   const [nativeHash, setNativeHash] = useState<`0x${string}` | null>(null);
   const nativeReceipt = useWaitForTransactionReceipt({
@@ -188,8 +194,8 @@ export default function Web3WalletPanel() {
     const toAddr = to.trim();
     if (!isHexAddress(toAddr)) {
       notifications.show({
-        title: "Send",
-        message: "Địa chỉ nhận không hợp lệ.",
+        title: t("web3.send.title"),
+        message: t("web3.send.invalid_to"),
         color: "red",
       });
       return;
@@ -197,8 +203,8 @@ export default function Web3WalletPanel() {
     const value = Number(amt);
     if (!Number.isFinite(value) || value <= 0) {
       notifications.show({
-        title: "Send",
-        message: "Số tiền không hợp lệ.",
+        title: t("web3.send.title"),
+        message: t("web3.send.invalid_amount"),
         color: "red",
       });
       return;
@@ -207,42 +213,39 @@ export default function Web3WalletPanel() {
     try {
       const hash = await sendTransactionAsync({
         to: toAddr as `0x${string}`,
-        value: parseUnits(String(value), 18), // ETH/SEP 18
+        value: parseUnits(String(value), 18),
       });
 
       setNativeHash(hash);
       notifications.show({
-        title: "Tx sent",
-        message: `Native tx: ${shortAddr(hash)}`,
+        title: t("web3.tx.sent_title"),
+        message: t("web3.tx.native_sent", { hash: shortAddr(hash) }),
       });
 
       setTo("");
       setAmt("");
     } catch (e: any) {
       notifications.show({
-        title: "Tx failed",
-        message: e?.message ?? "Unknown error",
+        title: t("web3.tx.failed_title"),
+        message: e?.message ?? t("web3.tx.unknown_error"),
         color: "red",
       });
     }
   };
 
-  /* ===================== Withdraw ERC20 (Rút ERC20) ===================== */
+  /* ===================== Withdraw ERC20 ===================== */
   const tokensOnChain = useMemo(
-    () => watched.filter((t) => t.chainId === chainId),
+    () => watched.filter((x) => x.chainId === chainId),
     [watched, chainId]
   );
 
   const [erc20TokenKey, setErc20TokenKey] = useState<string | null>(null);
   const selectedToken = useMemo(() => {
     if (!erc20TokenKey) return null;
-    return tokensOnChain.find(
-      (t) => `${t.chainId}:${t.address}` === erc20TokenKey
-    );
+    return tokensOnChain.find((x) => `${x.chainId}:${x.address}` === erc20TokenKey) ?? null;
   }, [erc20TokenKey, tokensOnChain]);
 
   useEffect(() => {
-    // auto pick first token if available
     if (!erc20TokenKey && tokensOnChain.length) {
       setErc20TokenKey(`${tokensOnChain[0].chainId}:${tokensOnChain[0].address}`);
     }
@@ -266,8 +269,8 @@ export default function Web3WalletPanel() {
 
     if (!selectedToken) {
       notifications.show({
-        title: "ERC20",
-        message: "Chọn token trước.",
+        title: t("web3.erc20.title"),
+        message: t("web3.erc20.pick_token_first"),
         color: "red",
       });
       return;
@@ -276,8 +279,8 @@ export default function Web3WalletPanel() {
     const toAddr = erc20To.trim();
     if (!isHexAddress(toAddr)) {
       notifications.show({
-        title: "ERC20",
-        message: "Địa chỉ nhận không hợp lệ.",
+        title: t("web3.erc20.title"),
+        message: t("web3.erc20.invalid_to"),
         color: "red",
       });
       return;
@@ -286,8 +289,8 @@ export default function Web3WalletPanel() {
     const value = Number(erc20Amt);
     if (!Number.isFinite(value) || value <= 0) {
       notifications.show({
-        title: "ERC20",
-        message: "Số lượng không hợp lệ.",
+        title: t("web3.erc20.title"),
+        message: t("web3.erc20.invalid_amount"),
         color: "red",
       });
       return;
@@ -305,16 +308,19 @@ export default function Web3WalletPanel() {
 
       setErc20Hash(hash);
       notifications.show({
-        title: "Tx sent",
-        message: `${selectedToken.symbol} tx: ${shortAddr(hash)}`,
+        title: t("web3.tx.sent_title"),
+        message: t("web3.tx.erc20_sent", {
+          symbol: selectedToken.symbol,
+          hash: shortAddr(hash),
+        }),
       });
 
       setErc20To("");
       setErc20Amt("");
     } catch (e: any) {
       notifications.show({
-        title: "Tx failed",
-        message: e?.message ?? "Unknown error",
+        title: t("web3.tx.failed_title"),
+        message: e?.message ?? t("web3.tx.unknown_error"),
         color: "red",
       });
     }
@@ -324,21 +330,29 @@ export default function Web3WalletPanel() {
   const erc20TxUrl = erc20Hash ? `${explorerBase(chainId)}/tx/${erc20Hash}` : null;
 
   const nativeStatus =
-    nativeReceipt.isLoading ? "PENDING" :
-    nativeReceipt.isSuccess ? "CONFIRMED" :
-    nativeReceipt.isError ? "FAILED" : null;
+    nativeReceipt.isLoading
+      ? "PENDING"
+      : nativeReceipt.isSuccess
+      ? "CONFIRMED"
+      : nativeReceipt.isError
+      ? "FAILED"
+      : null;
 
   const erc20Status =
-    erc20Receipt.isLoading ? "PENDING" :
-    erc20Receipt.isSuccess ? "CONFIRMED" :
-    erc20Receipt.isError ? "FAILED" : null;
+    erc20Receipt.isLoading
+      ? "PENDING"
+      : erc20Receipt.isSuccess
+      ? "CONFIRMED"
+      : erc20Receipt.isError
+      ? "FAILED"
+      : null;
 
   return (
     <Paper withBorder radius="lg" p="md" style={{ minWidth: 0 }}>
       <Group justify="space-between" mb="xs">
         <Group gap="xs">
           <IconWallet size={16} />
-          <Text fw={800}>Web3 Wallet</Text>
+          <Text fw={800}>{t("web3.title")}</Text>
         </Group>
 
         <Group gap="xs">
@@ -347,10 +361,10 @@ export default function Web3WalletPanel() {
           {!isConnected ? (
             <Button
               size="xs"
-              onClick={() => connect({ connector: connectors[0] })}
+              onClick={() => connect({ connector: connectors?.[0] })}
               loading={connecting}
             >
-              Connect (MetaMask)
+              {t("web3.connect_metamask")}
             </Button>
           ) : (
             <Button
@@ -359,22 +373,24 @@ export default function Web3WalletPanel() {
               leftSection={<IconPlugConnectedX size={14} />}
               onClick={() => disconnect()}
             >
-              Disconnect
+              {t("web3.disconnect")}
             </Button>
           )}
         </Group>
       </Group>
 
       <Stack gap="sm">
-        {/* Deposit section */}
+        {/* Deposit */}
         <Group justify="space-between" align="flex-start">
           <div>
-            <Text size="sm" c="dimmed">Deposit address (Nạp)</Text>
+            <Text size="sm" c="dimmed">
+              {t("web3.deposit.label")}
+            </Text>
             <Text size="sm" fw={800}>
               {isConnected ? shortAddr(address) : "--"}
             </Text>
             <Text size="xs" c="dimmed" mt={4}>
-              Nạp = bạn gửi token vào địa chỉ ví của bạn (MetaMask).
+              {t("web3.deposit.help")}
             </Text>
           </div>
 
@@ -385,12 +401,14 @@ export default function Web3WalletPanel() {
             disabled={!isConnected || !address}
             onClick={copyDeposit}
           >
-            Copy
+            {t("web3.copy")}
           </Button>
         </Group>
 
         <Group justify="space-between">
-          <Text size="sm" c="dimmed">Native balance</Text>
+          <Text size="sm" c="dimmed">
+            {t("web3.native_balance")}
+          </Text>
           <Text size="sm" fw={800}>
             {isConnected && nativeBal
               ? `${Number(nativeBal.formatted).toFixed(4)} ${nativeBal.symbol}`
@@ -406,7 +424,7 @@ export default function Web3WalletPanel() {
             loading={switching}
             onClick={() => switchChain({ chainId: sepolia.id })}
           >
-            Switch Sepolia
+            {t("web3.switch_sepolia")}
           </Button>
           <Button
             size="xs"
@@ -415,7 +433,7 @@ export default function Web3WalletPanel() {
             loading={switching}
             onClick={() => switchChain({ chainId: mainnet.id })}
           >
-            Switch Mainnet
+            {t("web3.switch_mainnet")}
           </Button>
         </Group>
 
@@ -423,48 +441,49 @@ export default function Web3WalletPanel() {
 
         {/* Watch tokens */}
         <Text fw={800} size="sm">
-          Watch tokens (ERC20)
+          {t("web3.watch_tokens_title")}
         </Text>
 
         <Group gap="xs" wrap="wrap">
           <TextInput
             value={tokenAddr}
             onChange={(e) => setTokenAddr(e.currentTarget.value)}
-            placeholder="0xTokenAddress"
+            placeholder={t("web3.watch.addr_ph")}
             style={{ flex: 1, minWidth: 220 }}
             disabled={!isConnected}
           />
           <TextInput
             value={tokenSymbol}
             onChange={(e) => setTokenSymbol(e.currentTarget.value)}
-            placeholder="SYM"
+            placeholder={t("web3.watch.sym_ph")}
             style={{ width: 90 }}
             disabled={!isConnected}
           />
           <TextInput
             value={tokenDecimals}
             onChange={(e) => setTokenDecimals(e.currentTarget.value)}
-            placeholder="dec"
+            placeholder={t("web3.watch.dec_ph")}
             style={{ width: 80 }}
             disabled={!isConnected}
           />
           <Button size="xs" onClick={addToken} disabled={!isConnected}>
-            Add
+            {t("web3.add")}
           </Button>
         </Group>
 
         <Stack gap={8}>
-          {tokensOnChain.map((t) => (
+          {tokensOnChain.map((tok) => (
             <TokenRow
-              key={`${t.chainId}-${t.address}`}
-              token={t}
+              key={`${tok.chainId}-${tok.address}`}
+              token={tok}
               owner={address}
-              onRemove={() => removeToken(t)}
+              onRemove={() => removeToken(tok)}
             />
           ))}
+
           {!tokensOnChain.length ? (
             <Text size="xs" c="dimmed">
-              Chưa có token nào. Thêm 1 ERC20 để theo dõi.
+              {t("web3.watch.empty")}
             </Text>
           ) : null}
         </Stack>
@@ -473,18 +492,18 @@ export default function Web3WalletPanel() {
 
         {/* Withdraw ERC20 */}
         <Text fw={800} size="sm">
-          Send ERC20 (withdraw)
+          {t("web3.erc20.send_title")}
         </Text>
 
         <Group gap="xs" wrap="wrap">
           <Select
             value={erc20TokenKey}
             onChange={setErc20TokenKey}
-            data={tokensOnChain.map((t) => ({
-              value: `${t.chainId}:${t.address}`,
-              label: `${t.symbol} • ${shortAddr(t.address)}`,
+            data={tokensOnChain.map((tok) => ({
+              value: `${tok.chainId}:${tok.address}`,
+              label: `${tok.symbol} • ${shortAddr(tok.address)}`,
             }))}
-            placeholder="Select token"
+            placeholder={t("web3.erc20.select_token_ph")}
             style={{ minWidth: 260, flex: 1 }}
             disabled={!isConnected || !tokensOnChain.length}
           />
@@ -492,14 +511,18 @@ export default function Web3WalletPanel() {
           <TextInput
             value={erc20To}
             onChange={(e) => setErc20To(e.currentTarget.value)}
-            placeholder="to: 0x..."
+            placeholder={t("web3.to_ph")}
             style={{ flex: 1, minWidth: 220 }}
             disabled={!isConnected}
           />
           <TextInput
             value={erc20Amt}
             onChange={(e) => setErc20Amt(e.currentTarget.value)}
-            placeholder={selectedToken ? `amount (${selectedToken.symbol})` : "amount"}
+            placeholder={
+              selectedToken
+                ? t("web3.amount_sym_ph", { sym: selectedToken.symbol })
+                : t("web3.amount_ph")
+            }
             style={{ width: 160 }}
             disabled={!isConnected || !selectedToken}
           />
@@ -509,19 +532,27 @@ export default function Web3WalletPanel() {
             disabled={!isConnected || !selectedToken}
             loading={sendingErc20}
           >
-            Send
+            {t("web3.send")}
           </Button>
         </Group>
 
         {erc20Hash ? (
           <Group justify="space-between">
             <Group gap="xs">
-              <Badge variant="light">ERC20 tx</Badge>
-              <Text size="xs" c="dimmed">{shortAddr(erc20Hash)}</Text>
+              <Badge variant="light">{t("web3.erc20.tx_badge")}</Badge>
+              <Text size="xs" c="dimmed">
+                {shortAddr(erc20Hash)}
+              </Text>
               {erc20Status ? (
                 <Badge
                   variant="light"
-                  color={erc20Status === "CONFIRMED" ? "green" : erc20Status === "FAILED" ? "red" : "yellow"}
+                  color={
+                    erc20Status === "CONFIRMED"
+                      ? "green"
+                      : erc20Status === "FAILED"
+                      ? "red"
+                      : "yellow"
+                  }
                 >
                   {erc20Status}
                 </Badge>
@@ -537,7 +568,7 @@ export default function Web3WalletPanel() {
                 target="_blank"
                 rel="noreferrer"
               >
-                View on Explorer
+                {t("web3.view_on_explorer")}
               </Button>
             ) : null}
           </Group>
@@ -547,21 +578,21 @@ export default function Web3WalletPanel() {
 
         {/* Withdraw Native */}
         <Text fw={800} size="sm">
-          Send native (withdraw)
+          {t("web3.native.send_title")}
         </Text>
 
         <Group gap="xs" wrap="wrap">
           <TextInput
             value={to}
             onChange={(e) => setTo(e.currentTarget.value)}
-            placeholder="to: 0x..."
+            placeholder={t("web3.to_ph")}
             style={{ flex: 1, minWidth: 220 }}
             disabled={!isConnected}
           />
           <TextInput
             value={amt}
             onChange={(e) => setAmt(e.currentTarget.value)}
-            placeholder="amount (ETH)"
+            placeholder={t("web3.native.amount_ph")}
             style={{ width: 160 }}
             disabled={!isConnected}
           />
@@ -571,19 +602,27 @@ export default function Web3WalletPanel() {
             disabled={!isConnected}
             loading={sendingNative}
           >
-            Send
+            {t("web3.send")}
           </Button>
         </Group>
 
         {nativeHash ? (
           <Group justify="space-between">
             <Group gap="xs">
-              <Badge variant="light">Native tx</Badge>
-              <Text size="xs" c="dimmed">{shortAddr(nativeHash)}</Text>
+              <Badge variant="light">{t("web3.native.tx_badge")}</Badge>
+              <Text size="xs" c="dimmed">
+                {shortAddr(nativeHash)}
+              </Text>
               {nativeStatus ? (
                 <Badge
                   variant="light"
-                  color={nativeStatus === "CONFIRMED" ? "green" : nativeStatus === "FAILED" ? "red" : "yellow"}
+                  color={
+                    nativeStatus === "CONFIRMED"
+                      ? "green"
+                      : nativeStatus === "FAILED"
+                      ? "red"
+                      : "yellow"
+                  }
                 >
                   {nativeStatus}
                 </Badge>
@@ -599,14 +638,14 @@ export default function Web3WalletPanel() {
                 target="_blank"
                 rel="noreferrer"
               >
-                View on Explorer
+                {t("web3.view_on_explorer")}
               </Button>
             ) : null}
           </Group>
         ) : null}
 
         <Text size="xs" c="dimmed">
-          App không lưu private key/seed. MetaMask ký giao dịch. Đây là demo an toàn.
+          {t("web3.footer_safe")}
         </Text>
       </Stack>
     </Paper>
@@ -622,6 +661,8 @@ function TokenRow({
   owner?: `0x${string}`;
   onRemove: () => void;
 }) {
+  const { t } = useI18n();
+
   const { data } = useReadContract({
     abi: ERC20_ABI,
     address: token.address,
@@ -633,15 +674,10 @@ function TokenRow({
   const bal = useMemo(() => {
     if (!data) return "--";
     const raw = BigInt(data as any);
-
-    // ✅ no 10n literal to avoid TS target issues
     const denom = BigInt(10) ** BigInt(token.decimals);
-
     const i = raw / denom;
     const f = raw % denom;
-    const frac = token.decimals
-      ? String(f).padStart(token.decimals, "0").slice(0, 4)
-      : "0";
+    const frac = token.decimals ? String(f).padStart(token.decimals, "0").slice(0, 4) : "0";
     return `${i.toString()}.${frac}`;
   }, [data, token.decimals]);
 
@@ -665,7 +701,7 @@ function TokenRow({
           {bal}
         </Text>
         <Button size="xs" variant="light" onClick={onRemove}>
-          Remove
+          {t("web3.remove")}
         </Button>
       </Group>
     </Group>

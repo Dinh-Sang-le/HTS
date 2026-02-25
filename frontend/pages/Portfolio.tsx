@@ -39,6 +39,7 @@ import {
 } from "recharts";
 
 import type { SymbolName } from "@/lib/fakeFeed";
+import { useI18n } from "@/lib/i18nProvider";
 
 type MotionCardProps = PaperProps &
   HTMLMotionProps<"div"> & {
@@ -181,7 +182,15 @@ function renderActiveShape(props: any) {
   );
 }
 
-function AllocTooltip({ active, payload }: { active?: boolean; payload?: any[] }) {
+function AllocTooltip({
+  active,
+  payload,
+  t,
+}: {
+  active?: boolean;
+  payload?: any[];
+  t: (k: string, vars?: Record<string, any>) => string;
+}) {
   if (!active || !payload || !payload.length) return null;
   const p = payload[0];
   const name = p?.name ?? "";
@@ -218,7 +227,7 @@ function AllocTooltip({ active, payload }: { active?: boolean; payload?: any[] }
         <Badge variant="light">{val}%</Badge>
       </Group>
       <Text size="xs" style={{ color: "rgba(255,255,255,0.55)" }}>
-        Allocation (mock)
+        {t("portfolio.allocation_mock")}
       </Text>
     </div>
   );
@@ -226,8 +235,10 @@ function AllocTooltip({ active, payload }: { active?: boolean; payload?: any[] }
 
 export default function PortfolioPage() {
   const router = useRouter();
+  const { t } = useI18n();
 
-  const cardBg = "linear-gradient(180deg, rgba(18,18,18,0.78), rgba(18,18,18,0.62))";
+  const cardBg =
+    "linear-gradient(180deg, rgba(18,18,18,0.78), rgba(18,18,18,0.62))";
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -255,9 +266,12 @@ export default function PortfolioPage() {
     return () => clearInterval(id);
   }, [mounted]);
 
-  const fmtMoney = (n: number) => "$" + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  const fmtMoney = (n: number) =>
+    "$" + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
   const fmtSignedMoney = (n: number) =>
-    (n >= 0 ? "+" : "-") + "$" + Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
+    (n >= 0 ? "+" : "-") +
+    "$" +
+    Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
 
   // ======= Allocation =======
   const allocation: AllocRow[] = useMemo(
@@ -297,7 +311,10 @@ export default function PortfolioPage() {
       setDailyPnL((prev) => {
         const next = [...prev];
         const i = next.length - 1;
-        next[i] = { ...next[i], p: clamp(Math.round(next[i].p + rnd(-35, 35)), -300, 300) };
+        next[i] = {
+          ...next[i],
+          p: clamp(Math.round(next[i].p + rnd(-35, 35)), -300, 300),
+        };
         return next;
       });
     }, 1100);
@@ -341,7 +358,9 @@ export default function PortfolioPage() {
     const id = setInterval(() => {
       setHoldings((prev) =>
         prev.map((h) => {
-          const step = (Math.random() - 0.5) * (h.s === "XAUUSD" ? 0.45 : h.s === "USDJPY" ? 0.03 : 0.0006);
+          const step =
+            (Math.random() - 0.5) *
+            (h.s === "XAUUSD" ? 0.45 : h.s === "USDJPY" ? 0.03 : 0.0006);
           const last = +(h.last + step).toFixed(h.s === "XAUUSD" || h.s === "USDJPY" ? 2 : 5);
           const dir = h.side === "LONG" ? 1 : -1;
           const uPnL = clamp(Math.round(h.uPnL + dir * rnd(-25, 25)), -900, 900);
@@ -380,7 +399,8 @@ export default function PortfolioPage() {
     return () => clearInterval(id);
   }, [mounted]);
 
-  const goTrade = (s: SymbolName) => router.push(`/trading?symbol=${encodeURIComponent(s)}`);
+  const goTrade = (s: SymbolName) =>
+    router.push(`/trading?symbol=${encodeURIComponent(s)}`);
 
   return (
     <Stack gap="md">
@@ -402,15 +422,15 @@ export default function PortfolioPage() {
               <IconBriefcase size={18} />
             </Box>
 
-            <Title order={2}>Portfolio</Title>
-            <Badge variant="light">Realtime mock</Badge>
+            <Title order={2}>{t("portfolio.title")}</Title>
+            <Badge variant="light">{t("portfolio.realtime_mock")}</Badge>
             <Badge variant="light" leftSection={<IconTrendingUp size={14} />}>
-              BLOOM PRO
+              {t("portfolio.badge.bloom_pro")}
             </Badge>
           </Group>
 
           <Text size="sm" c="dimmed">
-            Allocation • Performance • Holdings • Trades • Web3 wallet panel
+            {t("portfolio.subtitle")}
           </Text>
         </Stack>
 
@@ -418,68 +438,107 @@ export default function PortfolioPage() {
           <Button
             variant="light"
             leftSection={<IconDownload size={16} />}
-            onClick={() => notifications.show({ title: "Export", message: "Next: export CSV/PDF (mock)." })}
+            onClick={() =>
+              notifications.show({
+                title: t("portfolio.export_toast_title"),
+                message: t("portfolio.export_toast_msg"),
+              })
+            }
           >
-            Export
+            {t("portfolio.export")}
           </Button>
 
           <Button
             onClick={() => goTrade("XAUUSD")}
             styles={{ root: { background: "rgba(59,130,246,0.90)" } }}
           >
-            Trade XAUUSD
+            {t("portfolio.trade_xauusd")}
           </Button>
         </Group>
       </Group>
 
       {/* KPI row (Equity vẫn ở đây ✅) */}
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>
-        <MotionCard withBorder radius="lg" p="md" variants={cardAnim} initial="hidden" animate="show" style={{ background: cardBg }}>
+        <MotionCard
+          withBorder
+          radius="lg"
+          p="md"
+          variants={cardAnim}
+          initial="hidden"
+          animate="show"
+          style={{ background: cardBg }}
+        >
           <Text size="sm" c="dimmed">
-            Equity
+            {t("portfolio.kpi.equity")}
           </Text>
           <Title order={3}>{mounted ? fmtMoney(equity) : "--"}</Title>
           <Text size="sm" c="dimmed" mt={6}>
-            Live account value (mock)
+            {t("portfolio.kpi.live_account_value")}
           </Text>
         </MotionCard>
 
-        <MotionCard withBorder radius="lg" p="md" variants={cardAnim} initial="hidden" animate="show" style={{ background: cardBg }}>
+        <MotionCard
+          withBorder
+          radius="lg"
+          p="md"
+          variants={cardAnim}
+          initial="hidden"
+          animate="show"
+          style={{ background: cardBg }}
+        >
           <Text size="sm" c="dimmed">
-            Open P/L
+            {t("portfolio.kpi.open_pl")}
           </Text>
           <Title order={3} c={mounted ? (openPL >= 0 ? "green" : "red") : "dimmed"}>
             {mounted ? fmtSignedMoney(openPL) : "--"}
           </Title>
           <Text size="sm" c="dimmed" mt={6}>
-            Unrealized (mock)
+            {t("portfolio.kpi.unrealized")}
           </Text>
         </MotionCard>
 
-        <MotionCard withBorder radius="lg" p="md" variants={cardAnim} initial="hidden" animate="show" style={{ background: cardBg }}>
+        <MotionCard
+          withBorder
+          radius="lg"
+          p="md"
+          variants={cardAnim}
+          initial="hidden"
+          animate="show"
+          style={{ background: cardBg }}
+        >
           <Text size="sm" c="dimmed">
-            Today P/L
+            {t("portfolio.kpi.today_pl")}
           </Text>
           <Title order={3} c={mounted ? (todayPL >= 0 ? "green" : "red") : "dimmed"}>
             {mounted ? fmtSignedMoney(todayPL) : "--"}
           </Title>
           <Text size="sm" c="dimmed" mt={6}>
-            Intraday (mock)
+            {t("portfolio.kpi.intraday")}
           </Text>
         </MotionCard>
 
-        <MotionCard withBorder radius="lg" p="md" variants={cardAnim} initial="hidden" animate="show" style={{ background: cardBg }}>
+        <MotionCard
+          withBorder
+          radius="lg"
+          p="md"
+          variants={cardAnim}
+          initial="hidden"
+          animate="show"
+          style={{ background: cardBg }}
+        >
           <Group justify="space-between" align="flex-start">
             <div>
               <Text size="sm" c="dimmed">
-                Exposure Used
+                {t("portfolio.kpi.exposure_used")}
               </Text>
               <Title order={3}>{mounted ? `${usedPct}%` : "--"}</Title>
             </div>
-            <Badge variant="light">{mounted ? `${usedPct}% USED` : "--"}</Badge>
+            <Badge variant="light">
+              {mounted ? t("portfolio.kpi.used_badge", { pct: usedPct }) : "--"}
+            </Badge>
           </Group>
           <Text size="sm" c="dimmed" mt={6}>
-            Portfolio cap (mock)
+            {t("portfolio.kpi.portfolio_cap")}
           </Text>
         </MotionCard>
       </SimpleGrid>
@@ -497,10 +556,12 @@ export default function PortfolioPage() {
         >
           <Group justify="space-between" mb="xs">
             <Group gap="xs">
-              <Text fw={800}>Allocation</Text>
-              <Badge variant="light">{mounted ? `${usedPct}% USED` : "--"}</Badge>
+              <Text fw={800}>{t("portfolio.allocation")}</Text>
+              <Badge variant="light">
+                {mounted ? t("portfolio.kpi.used_badge", { pct: usedPct }) : "--"}
+              </Badge>
             </Group>
-            <Badge variant="light">Bloom glow</Badge>
+            <Badge variant="light">{t("portfolio.badge.bloom_glow")}</Badge>
           </Group>
 
           <div
@@ -560,7 +621,7 @@ export default function PortfolioPage() {
                       })}
                     </Pie>
 
-                    <Tooltip content={<AllocTooltip />} />
+                    <Tooltip content={<AllocTooltip t={t} />} />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
@@ -624,12 +685,12 @@ export default function PortfolioPage() {
           animate="show"
         >
           <Group justify="space-between" mb="xs">
-            <Text fw={800}>Performance</Text>
-            <Badge variant="light">Realtime</Badge>
+            <Text fw={800}>{t("portfolio.performance")}</Text>
+            <Badge variant="light">{t("portfolio.performance_realtime")}</Badge>
           </Group>
 
           <Text size="sm" c="dimmed">
-            Equity Curve
+            {t("portfolio.equity_curve")}
           </Text>
 
           <div style={{ height: 180, marginTop: 10 }}>
@@ -654,7 +715,7 @@ export default function PortfolioPage() {
           <Divider my="sm" />
 
           <Text size="sm" c="dimmed" mb={6}>
-            Daily P/L
+            {t("portfolio.daily_pl")}
           </Text>
 
           <div style={{ height: 140 }}>
@@ -672,19 +733,16 @@ export default function PortfolioPage() {
                   }}
                 />
                 <Bar dataKey="p">
-                {dailyPnL.map((x, i) => (
-                  <Cell
-                    key={i}
-                    fill={x.p >= 0 ? "rgba(16,185,129,0.9)" : "rgba(239,68,68,0.9)"}
-                  />
-                ))}
-              </Bar>
+                  {dailyPnL.map((x, i) => (
+                    <Cell key={i} fill={x.p >= 0 ? "rgba(16,185,129,0.9)" : "rgba(239,68,68,0.9)"} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
 
           <Text size="xs" c="dimmed" mt="sm">
-            Tip: hover Allocation để xem “bloom glow”.
+            {t("portfolio.tip_alloc_hover")}
           </Text>
         </MotionCard>
       </SimpleGrid>
@@ -702,30 +760,34 @@ export default function PortfolioPage() {
           animate="show"
         >
           <Group justify="space-between" mb="xs">
-            <Text fw={800}>Holdings</Text>
-            <Badge variant="light">Live (mock)</Badge>
+            <Text fw={800}>{t("portfolio.holdings")}</Text>
+            <Badge variant="light">{t("portfolio.holdings_live_mock")}</Badge>
           </Group>
 
           <Table highlightOnHover>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Symbol</Table.Th>
-                <Table.Th>Side</Table.Th>
-                <Table.Th>Lots</Table.Th>
-                <Table.Th>Entry</Table.Th>
-                <Table.Th>Last</Table.Th>
-                <Table.Th>P/L</Table.Th>
-                <Table.Th style={{ textAlign: "right" }}>Action</Table.Th>
+                <Table.Th>{t("portfolio.table.symbol")}</Table.Th>
+                <Table.Th>{t("portfolio.table.side")}</Table.Th>
+                <Table.Th>{t("portfolio.table.lots")}</Table.Th>
+                <Table.Th>{t("portfolio.table.entry")}</Table.Th>
+                <Table.Th>{t("portfolio.table.last")}</Table.Th>
+                <Table.Th>{t("portfolio.table.pl")}</Table.Th>
+                <Table.Th style={{ textAlign: "right" }}>{t("portfolio.table.action")}</Table.Th>
               </Table.Tr>
             </Table.Thead>
 
             <Table.Tbody>
               {holdings.map((h) => (
-                <Table.Tr key={h.s} style={{ cursor: "pointer" }} onDoubleClick={() => goTrade(h.s)}>
+                <Table.Tr
+                  key={h.s}
+                  style={{ cursor: "pointer" }}
+                  onDoubleClick={() => goTrade(h.s)}
+                >
                   <Table.Td>
                     <Text fw={900}>{h.s}</Text>
                     <Text size="xs" c="dimmed">
-                      Exposure {h.exposurePct}%
+                      {t("portfolio.exposure", { pct: h.exposurePct })}
                     </Text>
                   </Table.Td>
 
@@ -753,7 +815,7 @@ export default function PortfolioPage() {
                         goTrade(h.s);
                       }}
                     >
-                      Trade
+                      {t("common.trade")}
                     </Button>
                   </Table.Td>
                 </Table.Tr>
@@ -762,7 +824,7 @@ export default function PortfolioPage() {
           </Table>
 
           <Text size="xs" c="dimmed" mt="sm">
-            Double click row → Trade (route: /trading?symbol=...)
+            {t("portfolio.double_click_trade")}
           </Text>
         </MotionCard>
 
@@ -770,42 +832,51 @@ export default function PortfolioPage() {
         <div style={{ minWidth: 0 }}>
           <Web3WalletPanel />
           <Divider my="md" />
-          <MotionCard withBorder radius="lg" p="md" variants={cardAnim} initial="hidden" animate="show" style={{ background: cardBg }}>
+
+          <MotionCard
+            withBorder
+            radius="lg"
+            p="md"
+            variants={cardAnim}
+            initial="hidden"
+            animate="show"
+            style={{ background: cardBg }}
+          >
             <Group justify="space-between" mb="xs">
-              <Text fw={800}>Recent Trades</Text>
-              <Badge variant="light">Last 8</Badge>
+              <Text fw={800}>{t("portfolio.recent_trades")}</Text>
+              <Badge variant="light">{t("portfolio.last_8")}</Badge>
             </Group>
 
             <Table highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th>Time</Table.Th>
-                  <Table.Th>Sym</Table.Th>
-                  <Table.Th>Side</Table.Th>
-                  <Table.Th>Lots</Table.Th>
-                  <Table.Th>P/L</Table.Th>
+                  <Table.Th>{t("portfolio.table.time")}</Table.Th>
+                  <Table.Th>{t("portfolio.table.sym")}</Table.Th>
+                  <Table.Th>{t("portfolio.table.side")}</Table.Th>
+                  <Table.Th>{t("portfolio.table.lots")}</Table.Th>
+                  <Table.Th>{t("portfolio.table.pl")}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {trades.map((t) => (
-                  <Table.Tr key={t.id}>
+                {trades.map((tt) => (
+                  <Table.Tr key={tt.id}>
                     <Table.Td>
                       <Text size="sm" c="dimmed">
-                        {t.t}
+                        {tt.t}
                       </Text>
                     </Table.Td>
                     <Table.Td>
-                      <Text fw={800}>{t.s}</Text>
+                      <Text fw={800}>{tt.s}</Text>
                     </Table.Td>
                     <Table.Td>
-                      <Badge variant="light" color={t.side === "BUY" ? "green" : "blue"}>
-                        {t.side}
+                      <Badge variant="light" color={tt.side === "BUY" ? "green" : "blue"}>
+                        {tt.side}
                       </Badge>
                     </Table.Td>
-                    <Table.Td>{t.lots}</Table.Td>
-                    <Table.Td style={{ color: t.pnl >= 0 ? "lime" : "red", fontWeight: 800 }}>
-                      {t.pnl >= 0 ? "+" : ""}
-                      {t.pnl}
+                    <Table.Td>{tt.lots}</Table.Td>
+                    <Table.Td style={{ color: tt.pnl >= 0 ? "lime" : "red", fontWeight: 800 }}>
+                      {tt.pnl >= 0 ? "+" : ""}
+                      {tt.pnl}
                     </Table.Td>
                   </Table.Tr>
                 ))}
@@ -817,9 +888,14 @@ export default function PortfolioPage() {
             <Button
               fullWidth
               variant="light"
-              onClick={() => notifications.show({ title: "Journal", message: "Next: tag trades, screenshots, strategy labels (mock)." })}
+              onClick={() =>
+                notifications.show({
+                  title: t("portfolio.journal_toast_title"),
+                  message: t("portfolio.journal_toast_msg"),
+                })
+              }
             >
-              Open Journal
+              {t("portfolio.open_journal")}
             </Button>
           </MotionCard>
         </div>

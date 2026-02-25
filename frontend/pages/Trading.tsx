@@ -25,7 +25,6 @@ import {
   IconBolt,
   IconChartCandle,
   IconDashboard,
-  IconLayersLinked,
   IconLock,
   IconPlayerPlay,
 } from "@tabler/icons-react";
@@ -46,11 +45,25 @@ import OrderPanel, { type OrderDraft } from "@/components/OrderPanel";
 import OrderBook from "@/components/OrderBook";
 import PositionsTable from "@/components/PositionsTable";
 
+import { useI18n } from "@/lib/i18nProvider";
+
 // Chart SSR off
 const TradingChart = dynamic(() => import("@/components/TradingChart"), {
   ssr: false,
   loading: () => <div style={{ height: "100%", width: "100%" }} />,
 });
+
+/* ===================== i18n helpers ===================== */
+
+function fmtVars(s: string, vars?: Record<string, any>) {
+  if (!vars) return s;
+  return s.replace(/\{(\w+)\}/g, (_, k) => {
+    const v = vars[k];
+    return v === undefined || v === null ? "" : String(v);
+  });
+}
+
+/* ===================== Motion wrapper ===================== */
 
 type MotionCardProps = PaperProps &
   HTMLMotionProps<"div"> & {
@@ -126,12 +139,15 @@ function fmtSignedPct(n: number) {
 
 export default function TradingInstitutionalPage() {
   const router = useRouter();
+  const { t } = useI18n();
+  const tFmt = (key: string, vars?: Record<string, any>) => fmtVars(t(key), vars);
+
   const symbols: SymbolName[] = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY"];
   const [symbol, setSymbol] = useState<SymbolName>("XAUUSD");
 
   const { tick, depth, candles, spread, mounted } = useFeed(symbol);
 
-  // OMS engine (you already have)
+  // OMS engine
   useTradeEngine(symbol as any, tick as any, spread);
 
   const placeOrder = useTradeStore((s) => s.placeOrder);
@@ -140,6 +156,9 @@ export default function TradingInstitutionalPage() {
   const clearOrders = useTradeStore((s) => s.clearOrders);
   const hasHydrated = useTradeStore((s) => s.hasHydrated);
   const pos = getOpenPosition(symbol);
+  const fills = useTradeStore((s) => s.fills);
+  const fillsForSymbol = useMemo(() => fills.filter((f) => f.symbol === symbol), [fills, symbol]);
+  const positions = useTradeStore((s) => s.positions);
 
   // confirm modal
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -190,10 +209,10 @@ export default function TradingInstitutionalPage() {
   const risk = useMemo(() => evaluateRisk(riskSnap), [riskSnap]);
 
   const statusBadge = useMemo(() => {
-    if (risk.status === "VIOLATION") return <Badge color="red" variant="light">VIOLATION</Badge>;
-    if (risk.status === "AT_RISK") return <Badge color="yellow" variant="light">AT RISK</Badge>;
-    return <Badge color="green" variant="light">COMPLIANT</Badge>;
-  }, [risk.status]);
+    if (risk.status === "VIOLATION") return <Badge color="red" variant="light">{t("trading.risk.violation")}</Badge>;
+    if (risk.status === "AT_RISK") return <Badge color="yellow" variant="light">{t("trading.risk.at_risk")}</Badge>;
+    return <Badge color="green" variant="light">{t("trading.risk.compliant")}</Badge>;
+  }, [risk.status, t]);
 
   const [ticketPrice, setTicketPrice] = useState<number | null>(null);
   const [showLadder, setShowLadder] = useState(true);
@@ -230,7 +249,11 @@ export default function TradingInstitutionalPage() {
 
   function doMarket(side: "BUY" | "SELL") {
     if (risk.blocked) {
-      notifications.show({ title: "Blocked", message: "Risk rules violation. Trading blocked.", color: "red" });
+      notifications.show({
+        title: t("trading.toast.blocked_title"),
+        message: t("trading.toast.blocked_msg"),
+        color: "red",
+      });
       return;
     }
     if (!tick?.last) return;
@@ -242,8 +265,8 @@ export default function TradingInstitutionalPage() {
 
     if (r.ok) {
       notifications.show({
-        title: "Order Placed",
-        message: `${symbol} ${side} MARKET • #${r.order.id}`,
+        title: t("trading.toast.order_placed_title"),
+        message: tFmt("trading.toast.order_placed_msg", { symbol, side, id: r.order.id }),
         color: side === "BUY" ? "green" : "red",
       });
 
@@ -259,7 +282,7 @@ export default function TradingInstitutionalPage() {
         comment: r.order.comment,
       });
     } else {
-      notifications.show({ title: "Rejected", message: r.reason, color: "red" });
+      notifications.show({ title: t("trading.toast.rejected_title"), message: r.reason, color: "red" });
     }
   }
 
@@ -268,32 +291,42 @@ export default function TradingInstitutionalPage() {
   return (
     <Stack gap="md">
       {/* Confirm Modal */}
-      <Modal opened={confirmOpen} onClose={() => setConfirmOpen(false)} title="Order Confirmed" centered>
+      <Modal opened={confirmOpen} onClose={() => setConfirmOpen(false)} title={t("trading.modal.confirmed_title")} centered>
         {lastPlaced ? (
           <Stack gap="xs">
             <Text fw={800}>#{lastPlaced.id}</Text>
             <Text size="sm" c="dimmed">
-              {lastPlaced.sym} • {lastPlaced.type} • {lastPlaced.side} • Lots {lastPlaced.lots}
+              {tFmt("trading.modal.summary", {
+                sym: lastPlaced.sym,
+                type: lastPlaced.type,
+                side: lastPlaced.side,
+                lots: lastPlaced.lots,
+              })}
             </Text>
+
             <Text size="sm">
-              Price:{" "}
+              {t("trading.modal.price")}:{" "}
               <b>{lastPlaced.price ? formatPrice(lastPlaced.sym as any, lastPlaced.price) : "--"}</b>
             </Text>
+
             <Group justify="space-between">
-              <Text size="sm" c="dimmed">SL</Text>
+              <Text size="sm" c="dimmed">{t("trading.modal.sl")}</Text>
               <Text size="sm">{lastPlaced.sl ? formatPrice(lastPlaced.sym as any, lastPlaced.sl) : "--"}</Text>
             </Group>
+
             <Group justify="space-between">
-              <Text size="sm" c="dimmed">TP</Text>
+              <Text size="sm" c="dimmed">{t("trading.modal.tp")}</Text>
               <Text size="sm">{lastPlaced.tp ? formatPrice(lastPlaced.sym as any, lastPlaced.tp) : "--"}</Text>
             </Group>
 
             {lastPlaced.comment ? (
-              <Text size="sm" c="dimmed">Note: {lastPlaced.comment}</Text>
+              <Text size="sm" c="dimmed">
+                {tFmt("trading.modal.note", { note: lastPlaced.comment })}
+              </Text>
             ) : null}
 
             <Button onClick={() => setConfirmOpen(false)} color="green">
-              OK
+              {t("trading.modal.ok")}
             </Button>
           </Stack>
         ) : null}
@@ -317,19 +350,22 @@ export default function TradingInstitutionalPage() {
               <IconChartCandle size={18} />
             </Box>
 
-            <Title order={2}>Trading</Title>
-            <Badge variant="light">PAPER</Badge>
+            <Title order={2}>{t("trading.title")}</Title>
+            <Badge variant="light">{t("trading.badge.paper")}</Badge>
             {statusBadge}
           </Group>
 
           <Text size="sm" c="dimmed">
-            {symbol} • M1 (mock) • Spread {spread ?? "--"} • Feed: Fake WS • Hotkeys: B=Buy, S=Sell
+            {tFmt("trading.subtitle", {
+              symbol,
+              spread: spread ?? "--",
+            })}
           </Text>
         </Stack>
 
         <Group gap="xs">
           <Badge variant="light" leftSection={<IconBolt size={14} />}>
-            TURBO
+            {t("trading.badge.turbo")}
           </Badge>
 
           <Button
@@ -337,12 +373,12 @@ export default function TradingInstitutionalPage() {
             leftSection={<IconDashboard size={16} />}
             onClick={() =>
               notifications.show({
-                title: "Analytics",
-                message: "Next: open Analytics panel / route to dashboard analytics.",
+                title: t("trading.toast.analytics_title"),
+                message: t("trading.toast.analytics_msg"),
               })
             }
           >
-            Analytics
+            {t("trading.btn.analytics")}
           </Button>
 
           <Button
@@ -350,12 +386,12 @@ export default function TradingInstitutionalPage() {
             color={risk.blocked ? "red" : "blue"}
             onClick={() =>
               notifications.show({
-                title: "Trading Gate",
-                message: risk.blocked ? "Blocked by risk rules." : "Gate open (mock).",
+                title: t("trading.toast.gate_title"),
+                message: risk.blocked ? t("trading.toast.gate_blocked") : t("trading.toast.gate_open"),
               })
             }
           >
-            Gate
+            {t("trading.btn.gate")}
           </Button>
         </Group>
       </Group>
@@ -370,10 +406,10 @@ export default function TradingInstitutionalPage() {
 
         <Group gap="xs">
           <Button variant="light" onClick={() => setShowLadder((v) => !v)}>
-            {showLadder ? "Hide DOM" : "Show DOM"}
+            {showLadder ? t("trading.btn.hide_dom") : t("trading.btn.show_dom")}
           </Button>
           <Button variant="light" onClick={() => setShowFootprint((v) => !v)}>
-            {showFootprint ? "Hide Footprint" : "Show Footprint"}
+            {showFootprint ? t("trading.btn.hide_footprint") : t("trading.btn.show_footprint")}
           </Button>
         </Group>
       </Group>
@@ -381,7 +417,7 @@ export default function TradingInstitutionalPage() {
       {/* KPI row */}
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>
         <MotionCard withBorder radius="lg" p="md" variants={cardAnim} initial="hidden" animate="show" style={{ background: cardBg }}>
-          <Text size="sm" c="dimmed">Last</Text>
+          <Text size="sm" c="dimmed">{t("trading.kpi.last")}</Text>
           <Title order={3}>
             {mounted ? last.toFixed(symbol === "XAUUSD" || symbol === "USDJPY" ? 2 : 4) : "--"}
           </Title>
@@ -391,26 +427,26 @@ export default function TradingInstitutionalPage() {
         </MotionCard>
 
         <MotionCard withBorder radius="lg" p="md" variants={cardAnim} initial="hidden" animate="show" style={{ background: cardBg }}>
-          <Text size="sm" c="dimmed">Open P/L</Text>
+          <Text size="sm" c="dimmed">{t("trading.kpi.open_pl")}</Text>
           <Title order={3} c={mounted ? (openPL >= 0 ? "green" : "red") : "dimmed"} suppressHydrationWarning>
             {mounted ? `${openPL >= 0 ? "+" : "-"}$${Math.abs(openPL).toFixed(0)}` : "--"}
           </Title>
-          <Text size="sm" c="dimmed" mt={6}>Mark-to-market (mock)</Text>
+          <Text size="sm" c="dimmed" mt={6}>{t("trading.kpi.mtm_mock")}</Text>
         </MotionCard>
 
         <MotionCard withBorder radius="lg" p="md" variants={cardAnim} initial="hidden" animate="show" style={{ background: cardBg }}>
-          <Text size="sm" c="dimmed">Exposure Used</Text>
+          <Text size="sm" c="dimmed">{t("trading.kpi.exposure_used")}</Text>
           <Title order={3}>{mounted ? `${riskSnap.exposureUsedPct.toFixed(0)}%` : "--"}</Title>
           <Badge variant="light" color={riskSnap.exposureUsedPct >= 80 ? "yellow" : "green"} mt={6}>
-            {mounted ? (riskSnap.exposureUsedPct >= 80 ? "Near cap" : "OK") : "--"}
+            {mounted ? (riskSnap.exposureUsedPct >= 80 ? t("trading.kpi.near_cap") : t("trading.kpi.ok")) : "--"}
           </Badge>
         </MotionCard>
 
         <MotionCard withBorder radius="lg" p="md" variants={cardAnim} initial="hidden" animate="show" style={{ background: cardBg }}>
-          <Text size="sm" c="dimmed">Daily Loss Used</Text>
+          <Text size="sm" c="dimmed">{t("trading.kpi.daily_loss_used")}</Text>
           <Title order={3}>{mounted ? `${riskSnap.dailyLossUsedPct.toFixed(0)}%` : "--"}</Title>
           <Badge variant="light" color={riskSnap.dailyLossUsedPct >= 80 ? "yellow" : "green"} mt={6}>
-            {mounted ? (riskSnap.dailyLossUsedPct >= 80 ? "Near limit" : "OK") : "--"}
+            {mounted ? (riskSnap.dailyLossUsedPct >= 80 ? t("trading.kpi.near_limit") : t("trading.kpi.ok")) : "--"}
           </Badge>
         </MotionCard>
       </SimpleGrid>
@@ -429,25 +465,29 @@ export default function TradingInstitutionalPage() {
         >
           <Group justify="space-between" mb="xs">
             <Group gap="xs">
-              <Text fw={700}>Chart</Text>
+              <Text fw={700}>{t("trading.chart.title")}</Text>
               <Badge variant="light">{symbol}</Badge>
-              <Badge variant="light">Realtime mock</Badge>
+              <Badge variant="light">{t("trading.badge.realtime_mock")}</Badge>
 
-              {ticketPrice ? <Badge variant="outline">Limit @{ticketPrice}</Badge> : null}
+              {ticketPrice ? <Badge variant="outline">{tFmt("trading.badge.limit_at", { price: ticketPrice })}</Badge> : null}
 
               {hasHydrated && pos ? (
                 <Badge variant="outline" color={pos.side === "BUY" ? "green" : "red"}>
-                  POS {pos.side} {pos.lots.toFixed(2)} @ {formatPrice(pos.symbol as any, pos.entry)}
+                  {tFmt("trading.badge.position", {
+                    side: pos.side,
+                    lots: pos.lots.toFixed(2),
+                    entry: formatPrice(pos.symbol as any, pos.entry),
+                  })}
                 </Badge>
               ) : null}
             </Group>
 
             <Group gap="xs">
               <Button size="xs" color="green" disabled={risk.blocked} onClick={() => doMarket("BUY")}>
-                Market Buy
+                {t("trading.btn.market_buy")}
               </Button>
               <Button size="xs" color="red" disabled={risk.blocked} onClick={() => doMarket("SELL")}>
-                Market Sell
+                {t("trading.btn.market_sell")}
               </Button>
             </Group>
           </Group>
@@ -466,11 +506,13 @@ export default function TradingInstitutionalPage() {
               symbol={symbol}
               candles={candles}
               position={pos ?? null}
+              positions={positions}
+              fills={fillsForSymbol}
               rightBadges={
                 <>
-                  <Badge variant="light">Spread {spread ?? "--"}</Badge>
+                  <Badge variant="light">{t("trading.spread")} {spread ?? "--"}</Badge>
                   <Badge variant="light" color={risk.blocked ? "red" : "green"}>
-                    {risk.blocked ? "BLOCKED" : "READY"}
+                    {risk.blocked ? t("trading.state.blocked") : t("trading.state.ready")}
                   </Badge>
                 </>
               }
@@ -478,15 +520,6 @@ export default function TradingInstitutionalPage() {
           </Box>
 
           <Divider my="sm" />
-          <Group justify="space-between">
-            <Text size="sm" c="dimmed">
-              Risk engine: {risk.status} {risk.reasons.length ? `• ${risk.reasons.join(" • ")}` : ""}
-            </Text>
-
-            <Badge variant="light" leftSection={<IconLayersLinked size={14} />}>
-              Fake WS + Depth + Candles
-            </Badge>
-          </Group>
         </MotionCard>
 
         {/* Order Ticket */}
@@ -500,9 +533,9 @@ export default function TradingInstitutionalPage() {
           animate="show"
         >
           <Group justify="space-between" mb="xs">
-            <Text fw={700}>Order Ticket</Text>
+            <Text fw={700}>{t("trading.ticket.title")}</Text>
             <Badge variant="light" color={risk.blocked ? "red" : "green"}>
-              {risk.blocked ? "LOCKED" : "READY"}
+              {risk.blocked ? t("trading.ticket.locked") : t("trading.ticket.ready")}
             </Badge>
           </Group>
 
@@ -514,7 +547,11 @@ export default function TradingInstitutionalPage() {
             ticketPrice={ticketPrice}
             onSubmit={(draft: OrderDraft) => {
               if (risk.blocked) {
-                notifications.show({ title: "Blocked", message: "Risk rules violation. Trading blocked.", color: "red" });
+                notifications.show({
+                  title: t("trading.toast.blocked_title"),
+                  message: t("trading.toast.blocked_msg"),
+                  color: "red",
+                });
                 return;
               }
               if (!tick?.last) return;
@@ -536,8 +573,13 @@ export default function TradingInstitutionalPage() {
 
               if (r.ok) {
                 notifications.show({
-                  title: "Order accepted",
-                  message: `#${r.order.id} • ${draft.type} ${draft.side} ${symbol}`,
+                  title: t("trading.toast.order_accepted_title"),
+                  message: tFmt("trading.toast.order_accepted_msg", {
+                    id: r.order.id,
+                    type: draft.type,
+                    side: draft.side,
+                    symbol,
+                  }),
                   color: draft.side === "BUY" ? "green" : "red",
                 });
 
@@ -553,13 +595,17 @@ export default function TradingInstitutionalPage() {
                   comment: r.order.comment,
                 });
               } else {
-                notifications.show({ title: "Order rejected", message: r.reason, color: "red" });
+                notifications.show({
+                  title: t("trading.toast.order_rejected_title"),
+                  message: r.reason,
+                  color: "red",
+                });
               }
             }}
           />
 
           <Divider my="sm" />
-          <Text size="xs" c="dimmed">Tip: click price in DOM ladder → set limit price.</Text>
+          <Text size="xs" c="dimmed">{t("trading.ticket.tip_dom_click")}</Text>
         </MotionCard>
       </SimpleGrid>
 
@@ -567,8 +613,8 @@ export default function TradingInstitutionalPage() {
       <SimpleGrid cols={{ base: 1, lg: 3 }} spacing="md">
         <MotionCard withBorder radius="lg" p="md" variants={cardAnim} initial="hidden" animate="show" style={{ background: cardBg }}>
           <Group justify="space-between" mb="xs">
-            <Text fw={700}>Order Book</Text>
-            <Badge variant="light">mock/feed</Badge>
+            <Text fw={700}>{t("trading.orderbook.title")}</Text>
+            <Badge variant="light">{t("trading.orderbook.badge")}</Badge>
           </Group>
           <OrderBook depth={depth as any} mid={(depth?.mid ?? tick?.last) ?? null} />
         </MotionCard>
@@ -583,8 +629,7 @@ export default function TradingInstitutionalPage() {
           animate="show"
         >
           <Group justify="space-between" mb="xs">
-            <Text fw={700}>Positions</Text>
-            <Badge variant="light">live (demo)</Badge>
+            <Badge variant="light">{t("trading.positions.badge_live")}</Badge>
           </Group>
           <PositionsTable />
         </MotionCard>
@@ -594,12 +639,12 @@ export default function TradingInstitutionalPage() {
       <MotionCard withBorder radius="lg" p="md" variants={cardAnim} initial="hidden" animate="show" style={{ background: cardBg }}>
         <Group justify="space-between" mb="xs">
           <Group gap="xs">
-            <Text fw={700}>Order History</Text>
-            <Badge variant="light">{orders.length} orders</Badge>
+            <Text fw={700}>{t("trading.history.title")}</Text>
+            <Badge variant="light">{tFmt("trading.history.badge_orders", { n: orders.length })}</Badge>
           </Group>
           <Group gap="xs">
             <Button size="xs" variant="light" onClick={() => clearOrders()}>
-              Clear
+              {t("trading.history.clear")}
             </Button>
           </Group>
         </Group>
@@ -619,8 +664,15 @@ export default function TradingInstitutionalPage() {
               <div>
                 <Text fw={800} size="sm">#{o.id}</Text>
                 <Text size="xs" c="dimmed">
-                  {o.sym} • {o.type} • {o.side} • Lots {o.lots}
-                  {o.type === "LIMIT" && o.limitPrice != null ? ` • Lmt ${formatPrice(o.sym as any, o.limitPrice)}` : ""}
+                  {tFmt("trading.history.row_summary", {
+                    sym: o.sym,
+                    type: o.type,
+                    side: o.side,
+                    lots: o.lots,
+                  })}
+                  {o.type === "LIMIT" && o.limitPrice != null
+                    ? ` • ${t("trading.history.lmt")} ${formatPrice(o.sym as any, o.limitPrice)}`
+                    : ""}
                 </Text>
               </div>
 
@@ -630,40 +682,49 @@ export default function TradingInstitutionalPage() {
             </Group>
           ))}
 
-          {!orders.length ? <Text size="sm" c="dimmed">No orders yet.</Text> : null}
+          {!orders.length ? <Text size="sm" c="dimmed">{t("trading.history.empty")}</Text> : null}
         </Stack>
       </MotionCard>
 
       {/* Docked analytics */}
       <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
-        <FloatingPanel id="sizing" title="Position Sizing" badge="Matrix" defaultDocked={true}>
+        <FloatingPanel id="sizing" title={t("trading.fp.sizing_title")} badge={t("trading.fp.sizing_badge")} defaultDocked={true}>
           <PositionSizingMatrix symbol={symbol} equity={riskSnap.equity} />
         </FloatingPanel>
 
         <FloatingPanel
           id="footprint"
-          title="Orderflow"
-          badge="Footprint"
+          title={t("trading.fp.orderflow_title")}
+          badge={t("trading.fp.orderflow_badge")}
           defaultDocked={true}
           onClose={showFootprint ? () => setShowFootprint(false) : undefined}
         >
           {showFootprint ? (
             <FootprintMock symbol={symbol} mid={depth?.mid ?? tick?.last ?? null} />
           ) : (
-            <Text size="sm" c="dimmed">Footprint hidden.</Text>
+            <Text size="sm" c="dimmed">{t("trading.fp.footprint_hidden")}</Text>
           )}
         </FloatingPanel>
       </SimpleGrid>
 
       {/* DOM Ladder */}
       {showLadder ? (
-        <FloatingPanel id="dom" title="Depth Ladder" badge="DOM" defaultDocked={false} onClose={() => setShowLadder(false)}>
+        <FloatingPanel
+          id="dom"
+          title={t("trading.fp.dom_title")}
+          badge={t("trading.fp.dom_badge")}
+          defaultDocked={false}
+          onClose={() => setShowLadder(false)}
+        >
           <DOMLadder
             symbol={symbol}
             depth={depth}
             onPriceClick={(p) => {
               setTicketPrice(p);
-              notifications.show({ title: "Limit price set", message: `${symbol} limit price = ${p}` });
+              notifications.show({
+                title: t("trading.toast.limit_set_title"),
+                message: tFmt("trading.toast.limit_set_msg", { symbol, price: p }),
+              });
             }}
           />
         </FloatingPanel>

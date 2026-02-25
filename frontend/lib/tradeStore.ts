@@ -42,19 +42,32 @@ export type SavedOrder = {
   comment?: string;
 };
 
-/** Position hiển thị trong PositionsTable (giữ nguyên Price & P/L) */
+/** Position hiển thị trong PositionsTable (mỗi fill => 1 position) */
 export type Position = {
   id: string; // PositionsTable dùng p.id
+  orderId: string;
+
   symbol: SymbolName;
   side: Side;
   lots: number;
   entry: number;
 
-  // ✅ GIỮ NGUYÊN
+  // ✅ GIỮ NGUYÊN các cột đang dùng
   last: number; // Price column
   unrealizedPnl: number; // P/L column
 
   openedAt: number;
+};
+
+/** Fill marker để vẽ lên chart */
+export type Fill = {
+  id: string;
+  orderId: string;
+  symbol: SymbolName;
+  side: Side;
+  lots: number;
+  price: number;
+  ts: number; // epoch ms
 };
 
 type PlaceOrderInput = {
@@ -119,97 +132,72 @@ function shouldFillLimit(side: Side, limitPrice: number, tick: TickLike, spread?
   return bid >= limitPrice;
 }
 
-function weightedAvgPrice(p1: number, q1: number, p2: number, q2: number) {
-  const q = q1 + q2;
-  if (q <= 0) return p2;
-  return (p1 * q1 + p2 * q2) / q;
+/** P/L demo: USD-ish, dùng last - entry * lots * 100 (tuỳ bạn scale) */
+function calcPnlUSD(p: Pick<Position, "side" | "lots" | "entry">, last: number) {
+  const diff = p.side === "BUY" ? last - p.entry : p.entry - last;
+  // scale demo (giữ y như logic cũ style)
+  return diff * p.lots * 100;
 }
 
-/** Demo P/L: giữ đúng logic p.last + p.unrealizedPnl */
-function calcPnlUSD(pos: Pick<Position, "symbol" | "side" | "lots" | "entry">, last: number) {
-  const dir = pos.side === "BUY" ? 1 : -1;
-
-  // multiplier demo (bạn có thể thay theo symbolSpecs nếu muốn)
-  const mul =
-    pos.symbol === "XAUUSD"
-      ? 100
-      : pos.symbol === "USDJPY"
-      ? 100
-      : 100000; // EURUSD/GBPUSD demo
-
-  return (last - pos.entry) * dir * pos.lots * mul;
-}
-
-/** netting position: 1 position / symbol */
-function applyFillToPositions(prevPositions: Position[], fill: { sym: SymbolName; side: Side; lots: number; price: number; last: number }) {
-  const now = Date.now();
-  const cur = prevPositions.find((p) => p.symbol === fill.sym);
-
-  // no current => open new
-  if (!cur) {
-    const pos: Position = {
-      id: uid("pos_"),
-      symbol: fill.sym,
-      side: fill.side,
-      lots: fill.lots,
-      entry: fill.price,
-      last: fill.last,
-      unrealizedPnl: 0,
-      openedAt: now,
-    };
-    pos.unrealizedPnl = calcPnlUSD(pos, pos.last);
-    return [...prevPositions, pos];
-  }
-
-  // same side => increase & avg entry
-  if (cur.side === fill.side) {
-    const newLots = cur.lots + fill.lots;
-    const avgEntry = weightedAvgPrice(cur.entry, cur.lots, fill.price, fill.lots);
-
-    const updated: Position = {
-      ...cur,
-      lots: newLots,
-      entry: avgEntry,
-      last: fill.last,
-    };
-    updated.unrealizedPnl = calcPnlUSD(updated, updated.last);
-
-    return prevPositions.map((p) => (p.id === cur.id ? updated : p));
-  }
-
-  // opposite side => reduce/flip
-  const remaining = cur.lots - fill.lots;
-
-  // reduce (still cur side)
-  if (remaining > 0) {
-    const updated: Position = {
-      ...cur,
-      lots: remaining,
-      last: fill.last,
-    };
-    updated.unrealizedPnl = calcPnlUSD(updated, updated.last);
-    return prevPositions.map((p) => (p.id === cur.id ? updated : p));
-  }
-
-  // flat
-  if (remaining === 0) {
-    return prevPositions.filter((p) => p.id !== cur.id);
-  }
-
-  // flip: open new side with leftover
-  const newPos: Position = {
+/**
+ * ✅ HEDGING MODE:
+ * Mỗi fill tạo 1 Position riêng + thêm Fill marker
+ */
+function createPositionFromFill(args: {
+  orderId: string;
+  sym: SymbolName;
+  side: Side;
+  lots: number;
+  price: number;
+  last: number;
+  ts: number;
+}): Position {
+  const p: Position = {
     id: uid("pos_"),
-    symbol: fill.sym,
-    side: fill.side,
-    lots: Math.abs(remaining),
-    entry: fill.price,
-    last: fill.last,
+    orderId: args.orderId,
+    symbol: args.sym,
+    side: args.side,
+    lots: args.lots,
+    entry: args.price,
+    last: args.last,
     unrealizedPnl: 0,
-    openedAt: now,
+    openedAt: args.ts,
   };
-  newPos.unrealizedPnl = calcPnlUSD(newPos, newPos.last);
+  p.unrealizedPnl = calcPnlUSD(p, p.last);
+  return p;
+}
 
-  return [...prevPositions.filter((p) => p.id !== cur.id), newPos];
+/** Net position (gộp) để giữ UI badge/line entry như cũ */
+function computeNetPosition(positions: Position[], symbol: SymbolName): Position | null {
+  const ps = positions.filter((p) => p.symbol === symbol);
+  if (!ps.length) return null;
+
+  // nếu có hedge BUY+SELL cùng lúc thì net cần phức tạp hơn
+  // hiện tại giả định user vào 1 phía / hoặc bạn muốn hiển thị theo phía đang nhiều nhất
+  const buyLots = ps.filter((p) => p.side === "BUY").reduce((s, p) => s + p.lots, 0);
+  const sellLots = ps.filter((p) => p.side === "SELL").reduce((s, p) => s + p.lots, 0);
+
+  const side: Side = buyLots >= sellLots ? "BUY" : "SELL";
+  const sameSide = ps.filter((p) => p.side === side);
+  const totalLots = sameSide.reduce((s, p) => s + p.lots, 0);
+  if (totalLots <= 0) return null;
+
+  const avgEntry = sameSide.reduce((s, p) => s + p.entry * p.lots, 0) / totalLots;
+  const last = sameSide[0].last;
+
+  const net: Position = {
+    id: `net_${symbol}_${side}`,
+    orderId: "NET",
+    symbol,
+    side,
+    lots: totalLots,
+    entry: avgEntry,
+    last,
+    unrealizedPnl: calcPnlUSD({ side, lots: totalLots, entry: avgEntry }, last),
+    openedAt: sameSide[0].openedAt,
+  };
+
+  return net;
 }
 
 type TradeStore = {
@@ -219,9 +207,15 @@ type TradeStore = {
 
   orders: SavedOrder[];
   positions: Position[];
+  fills: Fill[];
 
   placeOrder: (input: PlaceOrderInput, ctx: PlaceCtx) => PlaceResult;
+
+  /** ✅ giữ API cũ: trả về NET position (gộp) */
   getOpenPosition: (symbol: SymbolName) => Position | null;
+
+  /** ✅ NEW: lấy list positions (nhiều dòng) */
+  getPositions: (symbol?: SymbolName) => Position[];
 
   closePosition: (positionId: string) => void;
 
@@ -246,14 +240,19 @@ export const useTradeStore = create<TradeStore>()(
 
       orders: [],
       positions: [],
+      fills: [],
 
       getOpenPosition: (symbol) => {
-        const p = get().positions.find((x) => x.symbol === symbol);
-        return p ?? null;
+        return computeNetPosition(get().positions, symbol);
+      },
+
+      getPositions: (symbol) => {
+        const ps = get().positions;
+        return symbol ? ps.filter((p) => p.symbol === symbol) : ps;
       },
 
       clearOrders: () => set({ orders: [] }),
-      resetAll: () => set({ orders: [], positions: [] }),
+      resetAll: () => set({ orders: [], positions: [], fills: [] }),
 
       closePosition: (positionId) => {
         set((st) => ({
@@ -289,7 +288,7 @@ export const useTradeStore = create<TradeStore>()(
 
         // ===== MARKET: fill immediately
         if (input.type === "MARKET") {
-          const fill = marketFillPrice(input.side, tick, spread);
+          const fillPrice = marketFillPrice(input.side, tick, spread);
 
           const ord: SavedOrder = {
             id,
@@ -299,25 +298,40 @@ export const useTradeStore = create<TradeStore>()(
             type: "MARKET",
             status: "FILLED",
             lots,
-            price: +fill,
+            price: +fillPrice,
             comment: input.comment,
             slPrice: null,
             tpPrice: null,
           };
 
-          // IMPORTANT: append new order, do not replace
           set((st) => {
             const nextOrders = [ord, ...st.orders].slice(0, 500);
 
-            const nextPositions = applyFillToPositions(st.positions, {
+            const pos = createPositionFromFill({
+              orderId: ord.id,
               sym: input.symbol,
               side: input.side,
               lots,
-              price: +fill,
+              price: +fillPrice,
               last: tick.last,
+              ts,
             });
 
-            return { orders: nextOrders, positions: nextPositions };
+            const fill: Fill = {
+              id: uid("fill_"),
+              orderId: ord.id,
+              symbol: input.symbol,
+              side: input.side,
+              lots,
+              price: +fillPrice,
+              ts,
+            };
+
+            return {
+              orders: nextOrders,
+              positions: [pos, ...st.positions],
+              fills: [fill, ...st.fills].slice(0, 300),
+            };
           });
 
           return { ok: true, order: toEngineOrder(ord) };
@@ -370,38 +384,58 @@ export const useTradeStore = create<TradeStore>()(
         );
         if (!openLimits.length) return;
 
-        const fills: Array<{ id: string; price: number; sym: SymbolName; side: Side; lots: number }> = [];
+        const fillsToApply: Array<{ id: string; price: number; sym: SymbolName; side: Side; lots: number; ts: number }> = [];
 
         for (const o of openLimits) {
           const lp = o.limitPrice!;
           if (shouldFillLimit(o.side, lp, tick, spread)) {
-            fills.push({ id: o.id, price: lp, sym: o.sym, side: o.side, lots: o.lots });
+            fillsToApply.push({ id: o.id, price: lp, sym: o.sym, side: o.side, lots: o.lots, ts: Date.now() });
           }
         }
 
-        if (!fills.length) return;
+        if (!fillsToApply.length) return;
 
         set((prev) => {
           // update orders -> mark them FILLED
           const nextOrders = prev.orders.map((o) => {
-            const f = fills.find((x) => x.id === o.id);
+            const f = fillsToApply.find((x) => x.id === o.id);
             if (!f) return o;
             return { ...o, status: "FILLED" as const, price: f.price };
           });
 
-          // apply fills to positions
-          let nextPositions = prev.positions;
-          for (const f of fills) {
-            nextPositions = applyFillToPositions(nextPositions, {
-              sym: f.sym,
+          // create positions + fills markers
+          const newPositions: Position[] = [];
+          const newFills: Fill[] = [];
+
+          for (const f of fillsToApply) {
+            newPositions.push(
+              createPositionFromFill({
+                orderId: f.id,
+                sym: f.sym,
+                side: f.side,
+                lots: f.lots,
+                price: f.price,
+                last: tick.last,
+                ts: f.ts,
+              })
+            );
+
+            newFills.push({
+              id: uid("fill_"),
+              orderId: f.id,
+              symbol: f.sym,
               side: f.side,
               lots: f.lots,
               price: f.price,
-              last: tick.last,
+              ts: f.ts,
             });
           }
 
-          return { orders: nextOrders, positions: nextPositions };
+          return {
+            orders: nextOrders,
+            positions: [...newPositions, ...prev.positions],
+            fills: [...newFills, ...prev.fills].slice(0, 300),
+          };
         });
       },
 
@@ -412,11 +446,12 @@ export const useTradeStore = create<TradeStore>()(
       },
     }),
     {
-      name: "hts_trade_store_v1",
-      version: 1,
+      name: "hts_trade_store_v2",
+      version: 2,
       partialize: (st) => ({
         orders: st.orders,
         positions: st.positions,
+        fills: st.fills,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);

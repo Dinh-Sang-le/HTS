@@ -1,18 +1,14 @@
-// pages/Settings.tsx
+// pages/settings.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
 import {
   ActionIcon,
   Badge,
   Box,
   Button,
-  Card,
   Divider,
-  Grid,
   Group,
-  NumberInput,
   Paper,
   SegmentedControl,
   Select,
@@ -24,719 +20,1045 @@ import {
   Text,
   TextInput,
   Title,
-  Tooltip,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import {
   IconBell,
-  IconBrush,
   IconCheck,
-  IconCloud,
+  IconCloudUpload,
   IconDeviceFloppy,
   IconKey,
   IconLock,
-  IconMoon,
+  IconPalette,
   IconRefresh,
+  IconScale,
+  IconSettings,
   IconShield,
-  IconSun,
+  IconSwitchHorizontal,
+  IconTrendingUp,
   IconUser,
   IconWand,
+  IconAlertTriangle,
+  IconTrash,
 } from "@tabler/icons-react";
 
-type ThemeMode = "DARK" | "LIGHT" | "SYSTEM";
-type Accent = "BLUE" | "GREEN" | "PURPLE" | "ORANGE";
+import type { Locale } from "@/lib/i18n";
+import { useI18n } from "@/lib/i18nProvider";
 
-const cardAnim = {
-  hidden: { opacity: 0, y: 10, scale: 0.99 },
-  show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.22 } },
+type ThemeMode = "dark" | "light" | "system";
+type Accent = "blue" | "green" | "purple" | "orange";
+
+const LS_SETTINGS = "hts-settings-v1";
+
+type SettingsState = {
+  // general
+  displayName: string;
+  email: string;
+  timezone: string;
+  // language
+  locale: Locale;
+
+  // workspace
+  comfortSpacing: boolean;
+  animations: boolean;
+  reduceBlur: boolean;
+
+  // appearance
+  themeMode: ThemeMode;
+  accent: Accent;
+  glassPanels: boolean;
+  microInteractions: boolean;
+
+  // trading
+  defaultLots: number;
+  defaultRiskPct: number;
+  defaultSLPips: number;
+  defaultTPPips: number;
+  oneClickTrading: boolean;
+  confirmBeforePlace: boolean;
+  autoFollowPrice: boolean;
+  hotkeysEnabled: boolean;
+
+  // risk
+  maxDailyLossPct: number;
+  maxDrawdownPct: number;
+  maxExposurePct: number;
+  blockTradingOnViolation: boolean;
+  showWarningsEarly: boolean;
+
+  // notifications
+  nOrderPlaced: boolean;
+  nOrderFilled: boolean;
+  nSLTPHit: boolean;
+  nRiskWarnings: boolean;
+  nSoundAlerts: boolean;
+  nDesktop: boolean;
+
+  // security
+  autoLockMinutes: number;
+  confirmSensitiveActions: boolean;
+  maskBalances: boolean;
+  allowClipboard: boolean;
+
+  // sync
+  cloudSyncEnabled: boolean;
 };
 
-function GlassCard(props: { title: string; icon: React.ReactNode; badge?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <motion.div variants={cardAnim} initial="hidden" animate="show">
-      <Paper
-        withBorder
-        radius="lg"
-        p="md"
-        style={{
-          background: "linear-gradient(180deg, rgba(18,18,18,0.78), rgba(18,18,18,0.62))",
-          border: "1px solid rgba(255,255,255,0.08)",
-          boxShadow: "0 18px 55px rgba(0,0,0,0.35)",
-        }}
-      >
-        <Group justify="space-between" mb="sm">
-          <Group gap="sm">
-            <Box
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 12,
-                display: "grid",
-                placeItems: "center",
-                background: "rgba(59,130,246,0.14)",
-                border: "1px solid rgba(59,130,246,0.22)",
-              }}
-            >
-              {props.icon}
-            </Box>
-            <Stack gap={0}>
-              <Text fw={800}>{props.title}</Text>
-              <Text size="xs" c="dimmed">
-                Configure your trading workspace (demo).
-              </Text>
-            </Stack>
-          </Group>
-          {props.badge}
-        </Group>
-        {props.children}
-      </Paper>
-    </motion.div>
-  );
-}
+const DEFAULTS: SettingsState = {
+  displayName: "Admin",
+  email: "admin@demo.local",
+  timezone: "Asia/Ho_Chi_Minh (GMT+7)",
+  locale: "vi",
 
-function useLocal<T>(key: string, initial: T) {
-  const [val, setVal] = useState<T>(initial);
+  comfortSpacing: true,
+  animations: true,
+  reduceBlur: false,
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(key);
-      if (raw) setVal(JSON.parse(raw));
-    } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  themeMode: "system",
+  accent: "orange",
+  glassPanels: true,
+  microInteractions: true,
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(key, JSON.stringify(val));
-    } catch {}
-  }, [key, val]);
+  defaultLots: 0.1,
+  defaultRiskPct: 1,
+  defaultSLPips: 0,
+  defaultTPPips: 0,
+  oneClickTrading: true,
+  confirmBeforePlace: true,
+  autoFollowPrice: true,
+  hotkeysEnabled: true,
 
-  return [val, setVal] as const;
+  maxDailyLossPct: 5,
+  maxDrawdownPct: 10,
+  maxExposurePct: 80,
+  blockTradingOnViolation: true,
+  showWarningsEarly: true,
+
+  nOrderPlaced: true,
+  nOrderFilled: true,
+  nSLTPHit: true,
+  nRiskWarnings: true,
+  nSoundAlerts: false,
+  nDesktop: false,
+
+  autoLockMinutes: 30,
+  confirmSensitiveActions: true,
+  maskBalances: false,
+  allowClipboard: true,
+
+  cloudSyncEnabled: true,
+};
+
+function clamp(n: number, a: number, b: number) {
+  return Math.max(a, Math.min(b, n));
 }
 
 export default function SettingsPage() {
-  // ===== persisted settings (localStorage)
-  const [profile, setProfile] = useLocal("hts.settings.profile", {
-    displayName: "Admin",
-    email: "admin@demo.local",
-    timezone: "Asia/Ho_Chi_Minh",
-    language: "vi",
-  });
+  const { locale, setLocale, t } = useI18n();
 
-  const [appearance, setAppearance] = useLocal("hts.settings.appearance", {
-    theme: "DARK" as ThemeMode,
-    accent: "BLUE" as Accent,
-    motion: true,
-    reduceBlur: false,
-    compactMode: false,
-  });
+  const [activeTab, setActiveTab] = useState<string>("general");
 
-  const [trade, setTrade] = useLocal("hts.settings.trade", {
-    defaultLots: 0.1,
-    oneClick: true,
-    confirmBeforePlace: true,
-    slDefaultPips: 0,
-    tpDefaultPips: 0,
-    riskPctDefault: 1,
-    autoFollowPrice: true,
-    hotkeys: true,
-  });
+  // persisted state
+  const [s, setS] = useState<SettingsState>({ ...DEFAULTS, locale });
 
-  const [risk, setRisk] = useLocal("hts.settings.risk", {
-    maxDailyLossPct: 5,
-    maxDrawdownPct: 10,
-    maxExposurePct: 80,
-    blockOnViolation: true,
-    showWarnings: true,
-  });
+  // draft language (apply on Save)
+  const [draftLang, setDraftLang] = useState<Locale>(locale);
 
-  const [notify, setNotify] = useLocal("hts.settings.notify", {
-    orderPlaced: true,
-    orderFilled: true,
-    sltpHit: true,
-    riskWarnings: true,
-    sound: false,
-    desktop: false,
-  });
+  // load saved settings
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LS_SETTINGS);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<SettingsState>;
+        const merged: SettingsState = {
+          ...DEFAULTS,
+          ...parsed,
+          locale: parsed.locale ?? locale,
+        };
+        setS(merged);
+        setDraftLang(merged.locale);
+      } else {
+        setS((prev) => ({ ...prev, locale }));
+        setDraftLang(locale);
+      }
+    } catch {
+      setS((prev) => ({ ...prev, locale }));
+      setDraftLang(locale);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const [security, setSecurity] = useLocal("hts.settings.security", {
-    lockAfterMin: 30,
-    requireConfirmSensitive: true,
-    maskBalances: false,
-    allowClipboard: true,
-  });
+  // if locale changed externally, keep draft in sync
+  useEffect(() => {
+    setDraftLang(locale);
+    setS((prev) => ({ ...prev, locale }));
+  }, [locale]);
 
-  // ===== derived
-  const accentBadge = useMemo(() => {
-    const map: Record<Accent, { label: string; color: string }> = {
-      BLUE: { label: "BLUE", color: "blue" },
-      GREEN: { label: "GREEN", color: "green" },
-      PURPLE: { label: "PURPLE", color: "grape" },
-      ORANGE: { label: "ORANGE", color: "orange" },
-    };
-    const a = map[appearance.accent];
-    return <Badge variant="light" color={a.color}>{a.label}</Badge>;
-  }, [appearance.accent]);
+  // ✅ có JA
+  const languageData = useMemo(
+    () => [
+      { value: "vi", label: "Tiếng Việt" },
+      { value: "en", label: "English" },
+      { value: "ko", label: "한국어" },
+      { value: "ja", label: "日本語" },
+    ],
+    []
+  );
 
-  const saveAll = () => {
+  const timezoneData = useMemo(
+    () => [
+      "Asia/Ho_Chi_Minh (GMT+7)",
+      "Asia/Seoul (GMT+9)",
+      "Asia/Tokyo (GMT+9)",
+      "UTC (GMT+0)",
+    ],
+    []
+  );
+
+  const onReset = () => {
+    const next = { ...DEFAULTS, locale };
+    setS(next);
+    setDraftLang(locale);
+    localStorage.setItem(LS_SETTINGS, JSON.stringify(next));
     notifications.show({
-      title: "Saved",
-      message: "Settings saved locally (demo).",
-      color: "green",
-      icon: <IconCheck size={16} />,
+      title: t("common.reset"),
+      message: t("settings.toast.reset_done"),
+      color: "blue",
+      icon: <IconRefresh size={18} />,
     });
   };
 
-  const resetAll = () => {
-    setProfile({ displayName: "Admin", email: "admin@demo.local", timezone: "Asia/Ho_Chi_Minh", language: "vi" });
-    setAppearance({ theme: "DARK", accent: "BLUE", motion: true, reduceBlur: false, compactMode: false });
-    setTrade({
-      defaultLots: 0.1,
-      oneClick: true,
-      confirmBeforePlace: true,
-      slDefaultPips: 0,
-      tpDefaultPips: 0,
-      riskPctDefault: 1,
-      autoFollowPrice: true,
-      hotkeys: true,
-    });
-    setRisk({ maxDailyLossPct: 5, maxDrawdownPct: 10, maxExposurePct: 80, blockOnViolation: true, showWarnings: true });
-    setNotify({ orderPlaced: true, orderFilled: true, sltpHit: true, riskWarnings: true, sound: false, desktop: false });
-    setSecurity({ lockAfterMin: 30, requireConfirmSensitive: true, maskBalances: false, allowClipboard: true });
+  const applyThemeAndAccent = (themeMode: ThemeMode, accent: Accent) => {
+    if (themeMode === "dark" || themeMode === "light") {
+      window.dispatchEvent(
+        new CustomEvent("hts-theme-changed", { detail: themeMode })
+      );
+    }
+    window.dispatchEvent(new CustomEvent("hts-accent-changed", { detail: accent }));
+  };
 
-    notifications.show({ title: "Reset", message: "Back to defaults.", color: "yellow", icon: <IconRefresh size={16} /> });
+  const onSave = () => {
+    const next: SettingsState = { ...s, locale: draftLang };
+
+    localStorage.setItem(LS_SETTINGS, JSON.stringify(next));
+
+    // ✅ chỉ đổi ngôn ngữ khi bấm Save
+    setLocale(draftLang);
+
+    applyThemeAndAccent(next.themeMode, next.accent);
+
+    notifications.show({
+      title: t("common.save"),
+      message: t("settings.toast.saved", {
+        lang: String(draftLang).toUpperCase(),
+        theme: next.themeMode,
+        accent: next.accent,
+      }),
+      color: "green",
+      icon: <IconCheck size={18} />,
+    });
+  };
+
+  const wipeLocalSettings = () => {
+    localStorage.removeItem(LS_SETTINGS);
+    localStorage.removeItem("hts-accent");
+    notifications.show({
+      title: t("settings.toast.wiped_title"),
+      message: t("settings.toast.wiped_msg"),
+      color: "red",
+      icon: <IconTrash size={18} />,
+    });
+    const next = { ...DEFAULTS, locale };
+    setS(next);
+    setDraftLang(locale);
   };
 
   return (
-    <Stack gap="md">
-      {/* Header */}
-      <Group justify="space-between" align="flex-end">
-        <Stack gap={4}>
-          <Group gap="xs">
-            <Box
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 12,
-                display: "grid",
-                placeItems: "center",
-                background: "rgba(99,102,241,0.14)",
-                border: "1px solid rgba(99,102,241,0.22)",
-              }}
-            >
-              <IconWand size={18} />
-            </Box>
-            <Title order={2}>Settings</Title>
-            <Badge variant="light">HTS</Badge>
-            {accentBadge}
+    <Box className="hts-settings-page">
+      <Stack gap="md">
+        {/* Header */}
+        <Group justify="space-between" align="flex-start">
+          <Stack gap={6}>
+            <Group gap="sm">
+              <ActionIcon radius="xl" variant="light" color="teal">
+                <IconSettings size={18} />
+              </ActionIcon>
+
+              <Title order={2} fw={900} className="hts-section-title">
+                {t("settings.title")}
+              </Title>
+
+              <Badge variant="light" color="blue">
+                HTS
+              </Badge>
+              <Badge variant="light" color="orange">
+                {String(s.accent).toUpperCase()}
+              </Badge>
+            </Group>
+
+            <Text size="sm" c="dimmed">
+              {t("settings.subtitle")}
+            </Text>
+          </Stack>
+
+          <Group>
+            <Button leftSection={<IconRefresh size={16} />} variant="light" onClick={onReset}>
+              {t("common.reset")}
+            </Button>
+            <Button leftSection={<IconDeviceFloppy size={16} />} color="green" onClick={onSave}>
+              {t("common.save")}
+            </Button>
           </Group>
-          <Text size="sm" c="dimmed">
-            Modern settings page (demo). No charts — only controls, preferences, and UX.
-          </Text>
-        </Stack>
-
-        <Group gap="xs">
-          <Button variant="light" leftSection={<IconRefresh size={16} />} onClick={resetAll}>
-            Reset
-          </Button>
-          <Button leftSection={<IconDeviceFloppy size={16} />} color="green" onClick={saveAll}>
-            Save
-          </Button>
         </Group>
-      </Group>
 
-      <Tabs defaultValue="general" keepMounted={false}>
-        <Tabs.List>
-          <Tabs.Tab value="general" leftSection={<IconUser size={16} />}>General</Tabs.Tab>
-          <Tabs.Tab value="appearance" leftSection={<IconBrush size={16} />}>Appearance</Tabs.Tab>
-          <Tabs.Tab value="trading" leftSection={<IconKey size={16} />}>Trading</Tabs.Tab>
-          <Tabs.Tab value="risk" leftSection={<IconShield size={16} />}>Risk</Tabs.Tab>
-          <Tabs.Tab value="notifications" leftSection={<IconBell size={16} />}>Notifications</Tabs.Tab>
-          <Tabs.Tab value="security" leftSection={<IconLock size={16} />}>Security</Tabs.Tab>
-          <Tabs.Tab value="sync" leftSection={<IconCloud size={16} />}>Sync</Tabs.Tab>
-        </Tabs.List>
+        {/* Tabs */}
+        <Tabs value={activeTab} onChange={(v) => setActiveTab(v || "general")} variant="default">
+          <Tabs.List>
+            <Tabs.Tab value="general" leftSection={<IconUser size={14} />}>
+              {t("settings.tabs.general")}
+            </Tabs.Tab>
+            <Tabs.Tab value="appearance" leftSection={<IconPalette size={14} />}>
+              {t("settings.tabs.appearance")}
+            </Tabs.Tab>
+            <Tabs.Tab value="trading" leftSection={<IconTrendingUp size={14} />}>
+              {t("settings.tabs.trading")}
+            </Tabs.Tab>
+            <Tabs.Tab value="risk" leftSection={<IconScale size={14} />}>
+              {t("settings.tabs.risk")}
+            </Tabs.Tab>
+            <Tabs.Tab value="notifications" leftSection={<IconBell size={14} />}>
+              {t("settings.tabs.notifications")}
+            </Tabs.Tab>
+            <Tabs.Tab value="security" leftSection={<IconShield size={14} />}>
+              {t("settings.tabs.security")}
+            </Tabs.Tab>
+            <Tabs.Tab value="sync" leftSection={<IconCloudUpload size={14} />}>
+              {t("settings.tabs.sync")}
+            </Tabs.Tab>
+          </Tabs.List>
 
-        {/* =================== GENERAL =================== */}
-        <Tabs.Panel value="general" pt="md">
-          <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
-            <GlassCard title="Profile" icon={<IconUser size={18} />} badge={<Badge variant="light">Local</Badge>}>
-              <Stack gap="sm">
-                <TextInput
-                  label="Display name"
-                  value={profile.displayName}
-                  onChange={(e) => setProfile((p) => ({ ...p, displayName: e.currentTarget.value }))}
-                />
-                <TextInput
-                  label="Email"
-                  value={profile.email}
-                  onChange={(e) => setProfile((p) => ({ ...p, email: e.currentTarget.value }))}
-                />
-                <Group grow>
-                  <Select
-                    label="Timezone"
+          {/* GENERAL */}
+          <Tabs.Panel value="general" pt="md">
+            <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
+              {/* Profile */}
+              <Paper withBorder radius="lg" p="md">
+                <Group justify="space-between" mb="xs">
+                  <Group gap="xs">
+                    <ActionIcon variant="light" radius="md" color="teal">
+                      <IconUser size={16} />
+                    </ActionIcon>
+                    <Text fw={800} className="hts-section-title">
+                      {t("settings.profile.title")}
+                    </Text>
+                  </Group>
+                  <Badge variant="light" color="blue">
+                    LOCAL
+                  </Badge>
+                </Group>
+
+                <Text size="xs" c="dimmed" mb="sm">
+                  {t("settings.profile.desc")}
+                </Text>
+
+                <Stack gap="sm">
+                  <TextInput
+                    label={t("settings.profile.display_name")}
+                    value={s.displayName}
+                    onChange={(e) => setS((p) => ({ ...p, displayName: e.currentTarget.value }))}
+                  />
+                  <TextInput
+                    label={t("settings.profile.email")}
+                    value={s.email}
+                    onChange={(e) => setS((p) => ({ ...p, email: e.currentTarget.value }))}
+                  />
+
+                  <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+                    <Select
+                      label={t("settings.profile.timezone")}
+                      value={s.timezone}
+                      onChange={(v) => setS((p) => ({ ...p, timezone: v || p.timezone }))}
+                      data={timezoneData}
+                    />
+                    <Select
+                      label={t("settings.language")}
+                      value={draftLang}
+                      onChange={(v) => setDraftLang((v as Locale) || "vi")}
+                      data={languageData}
+                    />
+                  </SimpleGrid>
+
+                  <Text size="xs" c="dimmed">
+                    {t("settings.language_tip")}
+                  </Text>
+                </Stack>
+              </Paper>
+
+              {/* Workspace */}
+              <Paper withBorder radius="lg" p="md">
+                <Group justify="space-between" mb="xs">
+                  <Group gap="xs">
+                    <ActionIcon variant="light" radius="md" color="teal">
+                      <IconSwitchHorizontal size={16} />
+                    </ActionIcon>
+                    <Text fw={800} className="hts-section-title">
+                      {t("settings.workspace.title")}
+                    </Text>
+                  </Group>
+
+                  <Badge variant="light" color="blue">
+                    UX
+                  </Badge>
+                </Group>
+
+                <Text size="xs" c="dimmed" mb="sm">
+                  {t("settings.workspace.desc")}
+                </Text>
+
+                <Stack gap="sm">
+                  <Switch
+                    checked={s.comfortSpacing}
+                    onChange={(e) => setS((p) => ({ ...p, comfortSpacing: e.currentTarget.checked }))}
+                    label={t("settings.workspace.comfort_spacing")}
+                    description={t("settings.workspace.comfort_spacing_desc")}
+                  />
+                  <Switch
+                    checked={s.animations}
+                    onChange={(e) => setS((p) => ({ ...p, animations: e.currentTarget.checked }))}
+                    label={t("settings.workspace.animations")}
+                    description={t("settings.workspace.animations_desc")}
+                  />
+                  <Switch
+                    checked={s.reduceBlur}
+                    onChange={(e) => setS((p) => ({ ...p, reduceBlur: e.currentTarget.checked }))}
+                    label={t("settings.workspace.reduce_blur")}
+                    description={t("settings.workspace.reduce_blur_desc")}
+                  />
+
+                  <Divider my="xs" />
+                  <Text size="xs" c="dimmed">
+                    {t("settings.workspace.tip")}
+                  </Text>
+                </Stack>
+              </Paper>
+            </SimpleGrid>
+          </Tabs.Panel>
+
+          {/* APPEARANCE */}
+          <Tabs.Panel value="appearance" pt="md">
+            <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
+              <Paper withBorder radius="lg" p="md">
+                <Group justify="space-between" mb="xs">
+                  <Group gap="xs">
+                    <ActionIcon variant="light" radius="md" color="teal">
+                      <IconPalette size={16} />
+                    </ActionIcon>
+                    <Text fw={800} className="hts-section-title">
+                      {t("settings.appearance.theme_title")}
+                    </Text>
+                  </Group>
+                  <Badge variant="light" color="orange">
+                    {String(s.accent).toUpperCase()}
+                  </Badge>
+                </Group>
+
+                <Text size="xs" c="dimmed" mb="sm">
+                  {t("settings.appearance.theme_desc")}
+                </Text>
+
+                <Stack gap="sm">
+                  <SegmentedControl
+                    fullWidth
+                    value={s.themeMode}
+                    onChange={(v) => setS((p) => ({ ...p, themeMode: v as ThemeMode }))}
                     data={[
-                      { value: "Asia/Ho_Chi_Minh", label: "Asia/Ho_Chi_Minh (GMT+7)" },
-                      { value: "Asia/Tokyo", label: "Asia/Tokyo (GMT+9)" },
-                      { value: "Europe/London", label: "Europe/London" },
-                      { value: "America/New_York", label: "America/New_York" },
+                      { value: "dark", label: t("settings.appearance.dark") },
+                      { value: "light", label: t("settings.appearance.light") },
+                      { value: "system", label: t("settings.appearance.system") },
                     ]}
-                    value={profile.timezone}
-                    onChange={(v) => setProfile((p) => ({ ...p, timezone: v || p.timezone }))}
                   />
-                  <Select
-                    label="Language"
+
+                  <SegmentedControl
+                    fullWidth
+                    value={s.accent}
+                    onChange={(v) => setS((p) => ({ ...p, accent: v as Accent }))}
                     data={[
-                      { value: "vi", label: "Tiếng Việt" },
-                      { value: "en", label: "English" },
-                      { value: "ko", label: "한국어" },
-                      { value: "ja", label: "日本語" },
+                      { value: "blue", label: t("settings.appearance.accent_blue") },
+                      { value: "green", label: t("settings.appearance.accent_green") },
+                      { value: "purple", label: t("settings.appearance.accent_purple") },
+                      { value: "orange", label: t("settings.appearance.accent_orange") },
                     ]}
-                    value={profile.language}
-                    onChange={(v) => setProfile((p) => ({ ...p, language: v || p.language }))}
                   />
-                </Group>
-              </Stack>
-            </GlassCard>
 
-            <GlassCard title="Workspace" icon={<IconWand size={18} />} badge={<Badge variant="light">UX</Badge>}>
-              <Stack gap="sm">
-                <Switch
-                  checked={!appearance.compactMode}
-                  onChange={(e) => setAppearance((a) => ({ ...a, compactMode: !e.currentTarget.checked }))}
-                  label="Comfort spacing"
-                  description="More padding / breathing room in panels."
-                />
-                <Switch
-                  checked={appearance.motion}
-                  onChange={(e) => setAppearance((a) => ({ ...a, motion: e.currentTarget.checked }))}
-                  label="Animations"
-                  description="Enable smooth transitions and micro-interactions."
-                />
-                <Switch
-                  checked={appearance.reduceBlur}
-                  onChange={(e) => setAppearance((a) => ({ ...a, reduceBlur: e.currentTarget.checked }))}
-                  label="Reduce blur"
-                  description="Improve performance on low-end devices."
-                />
-                <Divider />
-                <Text size="sm" c="dimmed">
-                  Tip: You can keep animations ON for a more premium feel.
-                </Text>
-              </Stack>
-            </GlassCard>
-          </SimpleGrid>
-        </Tabs.Panel>
-
-        {/* =================== APPEARANCE =================== */}
-        <Tabs.Panel value="appearance" pt="md">
-          <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
-            <GlassCard title="Theme" icon={<IconMoon size={18} />} badge={accentBadge}>
-              <Stack gap="sm">
-                <SegmentedControl
-                  value={appearance.theme}
-                  onChange={(v) => setAppearance((a) => ({ ...a, theme: v as ThemeMode }))}
-                  data={[
-                    { label: <Group gap={6}><IconMoon size={14} />Dark</Group>, value: "DARK" },
-                    { label: <Group gap={6}><IconSun size={14} />Light</Group>, value: "LIGHT" },
-                    { label: "System", value: "SYSTEM" },
-                  ]}
-                  fullWidth
-                />
-
-                <SegmentedControl
-                  value={appearance.accent}
-                  onChange={(v) => setAppearance((a) => ({ ...a, accent: v as Accent }))}
-                  data={[
-                    { label: "Blue", value: "BLUE" },
-                    { label: "Green", value: "GREEN" },
-                    { label: "Purple", value: "PURPLE" },
-                    { label: "Orange", value: "ORANGE" },
-                  ]}
-                  fullWidth
-                />
-
-                <Divider />
-                <Text size="sm" c="dimmed">
-                  (Demo) Your UI theme can later map to Mantine theme provider.
-                </Text>
-              </Stack>
-            </GlassCard>
-
-            <GlassCard title="Polish" icon={<IconBrush size={18} />} badge={<Badge variant="light">Pro</Badge>}>
-              <Stack gap="sm">
-                <Card radius="lg" withBorder style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}>
-                  <Group justify="space-between">
-                    <Text fw={700}>Glass panels</Text>
-                    <Badge variant="light">Enabled</Badge>
-                  </Group>
-                  <Text size="sm" c="dimmed" mt={6}>
-                    Subtle gradients, soft borders, premium shadows.
+                  <Text size="xs" c="dimmed">
+                    {t("settings.appearance.tip")}
                   </Text>
-                </Card>
+                </Stack>
+              </Paper>
 
-                <Card radius="lg" withBorder style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}>
-                  <Group justify="space-between">
-                    <Text fw={700}>Micro interactions</Text>
-                    <Badge variant="light" color={appearance.motion ? "green" : "yellow"}>
-                      {appearance.motion ? "ON" : "OFF"}
-                    </Badge>
+              <Paper withBorder radius="lg" p="md">
+                <Group justify="space-between" mb="xs">
+                  <Group gap="xs">
+                    <ActionIcon variant="light" radius="md" color="teal">
+                      <IconWand size={16} />
+                    </ActionIcon>
+                    <Text fw={800} className="hts-section-title">
+                      {t("settings.appearance.polish_title")}
+                    </Text>
                   </Group>
-                  <Text size="sm" c="dimmed" mt={6}>
-                    Hover lift, smooth fades, responsive toggles.
-                  </Text>
-                </Card>
-              </Stack>
-            </GlassCard>
-          </SimpleGrid>
-        </Tabs.Panel>
-
-        {/* =================== TRADING =================== */}
-        <Tabs.Panel value="trading" pt="md">
-          <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
-            <GlassCard title="Order defaults" icon={<IconKey size={18} />} badge={<Badge variant="light">Ticket</Badge>}>
-              <Stack gap="sm">
-                <Group grow>
-                  <NumberInput
-                    label="Default lots"
-                    value={trade.defaultLots}
-                    onChange={(v) => setTrade((t) => ({ ...t, defaultLots: Number(v) || 0 }))}
-                    min={0.01}
-                    step={0.01}
-                    decimalScale={2}
-                  />
-                  <NumberInput
-                    label="Risk % default"
-                    value={trade.riskPctDefault}
-                    onChange={(v) => setTrade((t) => ({ ...t, riskPctDefault: Number(v) || 0 }))}
-                    min={0.25}
-                    step={0.25}
-                    decimalScale={2}
-                  />
+                  <Badge variant="light" color="blue">
+                    PRO
+                  </Badge>
                 </Group>
 
-                <Group grow>
-                  <NumberInput
-                    label="SL default (pips)"
-                    value={trade.slDefaultPips}
-                    onChange={(v) => setTrade((t) => ({ ...t, slDefaultPips: Number(v) || 0 }))}
-                    min={0}
+                <Stack gap="sm">
+                  <Switch
+                    checked={s.glassPanels}
+                    onChange={(e) => setS((p) => ({ ...p, glassPanels: e.currentTarget.checked }))}
+                    label={t("settings.appearance.glass_panels")}
+                    description={t("settings.appearance.glass_panels_desc")}
                   />
-                  <NumberInput
-                    label="TP default (pips)"
-                    value={trade.tpDefaultPips}
-                    onChange={(v) => setTrade((t) => ({ ...t, tpDefaultPips: Number(v) || 0 }))}
-                    min={0}
+                  <Switch
+                    checked={s.microInteractions}
+                    onChange={(e) => setS((p) => ({ ...p, microInteractions: e.currentTarget.checked }))}
+                    label={t("settings.appearance.micro_interactions")}
+                    description={t("settings.appearance.micro_interactions_desc")}
                   />
+                </Stack>
+              </Paper>
+            </SimpleGrid>
+          </Tabs.Panel>
+
+          {/* TRADING */}
+          <Tabs.Panel value="trading" pt="md">
+            <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
+              <Paper withBorder radius="lg" p="md">
+                <Group justify="space-between" mb="xs">
+                  <Group gap="xs">
+                    <ActionIcon variant="light" radius="md" color="teal">
+                      <IconTrendingUp size={16} />
+                    </ActionIcon>
+                    <Text fw={800} className="hts-section-title">
+                      {t("settings.trading.defaults_title")}
+                    </Text>
+                  </Group>
+                  <Badge variant="light" color="blue">
+                    TICKET
+                  </Badge>
                 </Group>
 
-                <Divider />
-
-                <Switch
-                  checked={trade.oneClick}
-                  onChange={(e) => setTrade((t) => ({ ...t, oneClick: e.currentTarget.checked }))}
-                  label="One-click trading"
-                  description="Place market orders instantly from hotkeys/buttons."
-                />
-                <Switch
-                  checked={trade.confirmBeforePlace}
-                  onChange={(e) => setTrade((t) => ({ ...t, confirmBeforePlace: e.currentTarget.checked }))}
-                  label="Confirm before place"
-                  description="Show confirm modal after submitting order."
-                />
-                <Switch
-                  checked={trade.autoFollowPrice}
-                  onChange={(e) => setTrade((t) => ({ ...t, autoFollowPrice: e.currentTarget.checked }))}
-                  label="Auto follow price"
-                  description="Keep the newest candles in view (like TradingView)."
-                />
-              </Stack>
-            </GlassCard>
-
-            <GlassCard title="Hotkeys" icon={<IconKey size={18} />} badge={<Badge variant="light">Pro</Badge>}>
-              <Stack gap="sm">
-                <Switch
-                  checked={trade.hotkeys}
-                  onChange={(e) => setTrade((t) => ({ ...t, hotkeys: e.currentTarget.checked }))}
-                  label="Enable hotkeys"
-                  description="B=Buy, S=Sell, L=DOM tip…"
-                />
-
-                <Card radius="lg" withBorder style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}>
-                  <Grid>
-                    <Grid.Col span={6}><Text size="sm" c="dimmed">Buy Market</Text></Grid.Col>
-                    <Grid.Col span={6}><Badge variant="light">B</Badge></Grid.Col>
-                    <Grid.Col span={6}><Text size="sm" c="dimmed">Sell Market</Text></Grid.Col>
-                    <Grid.Col span={6}><Badge variant="light">S</Badge></Grid.Col>
-                    <Grid.Col span={6}><Text size="sm" c="dimmed">DOM Tip</Text></Grid.Col>
-                    <Grid.Col span={6}><Badge variant="light">L</Badge></Grid.Col>
-                  </Grid>
-                </Card>
-
-                <Text size="xs" c="dimmed">
-                  Later you can bind hotkeys per layout/workspace.
-                </Text>
-              </Stack>
-            </GlassCard>
-          </SimpleGrid>
-        </Tabs.Panel>
-
-        {/* =================== RISK =================== */}
-        <Tabs.Panel value="risk" pt="md">
-          <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
-            <GlassCard title="Risk limits" icon={<IconShield size={18} />} badge={<Badge variant="light">Prop</Badge>}>
-              <Stack gap="sm">
-                <Text size="sm" c="dimmed">
-                  Set limits (demo). Your real risk engine can consume these values later.
+                <Text size="xs" c="dimmed" mb="sm">
+                  {t("settings.trading.defaults_desc")}
                 </Text>
 
-                <Stack gap={6}>
-                  <Group justify="space-between">
-                    <Text size="sm">Max daily loss</Text>
-                    <Badge variant="light">{risk.maxDailyLossPct}%</Badge>
-                  </Group>
-                  <Slider
-                    value={risk.maxDailyLossPct}
-                    onChange={(v) => setRisk((r) => ({ ...r, maxDailyLossPct: v }))}
-                    min={1}
-                    max={15}
-                    step={1}
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+                  <TextInput
+                    label={t("settings.trading.default_lots")}
+                    value={String(s.defaultLots)}
+                    onChange={(e) =>
+                      setS((p) => ({
+                        ...p,
+                        defaultLots: clamp(Number(e.currentTarget.value || 0), 0, 100),
+                      }))
+                    }
+                  />
+                  <TextInput
+                    label={t("settings.trading.default_risk_pct")}
+                    value={String(s.defaultRiskPct)}
+                    onChange={(e) =>
+                      setS((p) => ({
+                        ...p,
+                        defaultRiskPct: clamp(Number(e.currentTarget.value || 0), 0, 100),
+                      }))
+                    }
+                  />
+                  <TextInput
+                    label={t("settings.trading.default_sl_pips")}
+                    value={String(s.defaultSLPips)}
+                    onChange={(e) =>
+                      setS((p) => ({
+                        ...p,
+                        defaultSLPips: clamp(Number(e.currentTarget.value || 0), 0, 100000),
+                      }))
+                    }
+                  />
+                  <TextInput
+                    label={t("settings.trading.default_tp_pips")}
+                    value={String(s.defaultTPPips)}
+                    onChange={(e) =>
+                      setS((p) => ({
+                        ...p,
+                        defaultTPPips: clamp(Number(e.currentTarget.value || 0), 0, 100000),
+                      }))
+                    }
+                  />
+                </SimpleGrid>
+
+                <Divider my="sm" />
+
+                <Stack gap="sm">
+                  <Switch
+                    checked={s.oneClickTrading}
+                    onChange={(e) => setS((p) => ({ ...p, oneClickTrading: e.currentTarget.checked }))}
+                    label={t("settings.trading.one_click")}
+                    description={t("settings.trading.one_click_desc")}
+                  />
+                  <Switch
+                    checked={s.confirmBeforePlace}
+                    onChange={(e) => setS((p) => ({ ...p, confirmBeforePlace: e.currentTarget.checked }))}
+                    label={t("settings.trading.confirm_before_place")}
+                    description={t("settings.trading.confirm_before_place_desc")}
+                  />
+                  <Switch
+                    checked={s.autoFollowPrice}
+                    onChange={(e) => setS((p) => ({ ...p, autoFollowPrice: e.currentTarget.checked }))}
+                    label={t("settings.trading.auto_follow")}
+                    description={t("settings.trading.auto_follow_desc")}
                   />
                 </Stack>
+              </Paper>
 
-                <Stack gap={6}>
-                  <Group justify="space-between">
-                    <Text size="sm">Max drawdown</Text>
-                    <Badge variant="light">{risk.maxDrawdownPct}%</Badge>
+              <Paper withBorder radius="lg" p="md">
+                <Group justify="space-between" mb="xs">
+                  <Group gap="xs">
+                    <ActionIcon variant="light" radius="md" color="teal">
+                      <IconKey size={16} />
+                    </ActionIcon>
+                    <Text fw={800} className="hts-section-title">
+                      {t("settings.trading.hotkeys_title")}
+                    </Text>
                   </Group>
-                  <Slider
-                    value={risk.maxDrawdownPct}
-                    onChange={(v) => setRisk((r) => ({ ...r, maxDrawdownPct: v }))}
-                    min={2}
-                    max={25}
-                    step={1}
-                  />
-                </Stack>
-
-                <Stack gap={6}>
-                  <Group justify="space-between">
-                    <Text size="sm">Max exposure</Text>
-                    <Badge variant="light">{risk.maxExposurePct}%</Badge>
-                  </Group>
-                  <Slider
-                    value={risk.maxExposurePct}
-                    onChange={(v) => setRisk((r) => ({ ...r, maxExposurePct: v }))}
-                    min={10}
-                    max={100}
-                    step={5}
-                  />
-                </Stack>
-
-                <Divider />
+                  <Badge variant="light" color="blue">
+                    PRO
+                  </Badge>
+                </Group>
 
                 <Switch
-                  checked={risk.blockOnViolation}
-                  onChange={(e) => setRisk((r) => ({ ...r, blockOnViolation: e.currentTarget.checked }))}
-                  label="Block trading on violation"
-                  description="If enabled, trade gate becomes LOCKED."
+                  checked={s.hotkeysEnabled}
+                  onChange={(e) => setS((p) => ({ ...p, hotkeysEnabled: e.currentTarget.checked }))}
+                  label={t("settings.trading.hotkeys_enable")}
+                  description={t("settings.trading.hotkeys_desc")}
                 />
 
-                <Switch
-                  checked={risk.showWarnings}
-                  onChange={(e) => setRisk((r) => ({ ...r, showWarnings: e.currentTarget.checked }))}
-                  label="Show warnings"
-                  description="Display AT RISK warnings earlier."
-                />
-              </Stack>
-            </GlassCard>
+                <Divider my="sm" />
 
-            <GlassCard title="Risk preview" icon={<IconShield size={18} />} badge={<Badge variant="light">UX</Badge>}>
-              <Stack gap="sm">
-                <Card radius="lg" withBorder style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}>
+                <Paper withBorder radius="md" p="sm">
                   <Group justify="space-between">
-                    <Text fw={700}>Trade gate</Text>
-                    <Badge variant="light" color={risk.blockOnViolation ? "green" : "yellow"}>
-                      {risk.blockOnViolation ? "STRICT" : "SOFT"}
+                    <Text size="sm">{t("settings.trading.hk_buy")}</Text>
+                    <Badge variant="light">B</Badge>
+                  </Group>
+                  <Group justify="space-between" mt="xs">
+                    <Text size="sm">{t("settings.trading.hk_sell")}</Text>
+                    <Badge variant="light">S</Badge>
+                  </Group>
+                  <Group justify="space-between" mt="xs">
+                    <Text size="sm">{t("settings.trading.hk_dom")}</Text>
+                    <Badge variant="light">L</Badge>
+                  </Group>
+                </Paper>
+
+                <Text size="xs" c="dimmed" mt="sm">
+                  {t("settings.trading.hotkeys_tip")}
+                </Text>
+              </Paper>
+            </SimpleGrid>
+          </Tabs.Panel>
+
+          {/* RISK */}
+          <Tabs.Panel value="risk" pt="md">
+            <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
+              <Paper withBorder radius="lg" p="md">
+                <Group justify="space-between" mb="xs">
+                  <Group gap="xs">
+                    <ActionIcon variant="light" radius="md" color="teal">
+                      <IconScale size={16} />
+                    </ActionIcon>
+                    <Text fw={800} className="hts-section-title">
+                      {t("settings.risk.limits_title")}
+                    </Text>
+                  </Group>
+                  <Badge variant="light" color="blue">
+                    PROP
+                  </Badge>
+                </Group>
+
+                <Text size="xs" c="dimmed" mb="sm">
+                  {t("settings.risk.limits_desc")}
+                </Text>
+
+                <Stack gap="md">
+                  <Box>
+                    <Group justify="space-between" mb={6}>
+                      <Text size="sm">{t("settings.risk.max_daily_loss")}</Text>
+                      <Badge variant="light">{s.maxDailyLossPct}%</Badge>
+                    </Group>
+                    <Slider
+                      value={s.maxDailyLossPct}
+                      onChange={(v) => setS((p) => ({ ...p, maxDailyLossPct: v }))}
+                      min={1}
+                      max={20}
+                      step={1}
+                    />
+                  </Box>
+
+                  <Box>
+                    <Group justify="space-between" mb={6}>
+                      <Text size="sm">{t("settings.risk.max_drawdown")}</Text>
+                      <Badge variant="light">{s.maxDrawdownPct}%</Badge>
+                    </Group>
+                    <Slider
+                      value={s.maxDrawdownPct}
+                      onChange={(v) => setS((p) => ({ ...p, maxDrawdownPct: v }))}
+                      min={1}
+                      max={30}
+                      step={1}
+                    />
+                  </Box>
+
+                  <Box>
+                    <Group justify="space-between" mb={6}>
+                      <Text size="sm">{t("settings.risk.max_exposure")}</Text>
+                      <Badge variant="light">{s.maxExposurePct}%</Badge>
+                    </Group>
+                    <Slider
+                      value={s.maxExposurePct}
+                      onChange={(v) => setS((p) => ({ ...p, maxExposurePct: v }))}
+                      min={10}
+                      max={100}
+                      step={5}
+                    />
+                  </Box>
+
+                  <Switch
+                    checked={s.blockTradingOnViolation}
+                    onChange={(e) => setS((p) => ({ ...p, blockTradingOnViolation: e.currentTarget.checked }))}
+                    label={t("settings.risk.block_on_violation")}
+                    description={t("settings.risk.block_on_violation_desc")}
+                  />
+                  <Switch
+                    checked={s.showWarningsEarly}
+                    onChange={(e) => setS((p) => ({ ...p, showWarningsEarly: e.currentTarget.checked }))}
+                    label={t("settings.risk.show_warnings")}
+                    description={t("settings.risk.show_warnings_desc")}
+                  />
+                </Stack>
+              </Paper>
+
+              <Paper withBorder radius="lg" p="md">
+                <Group justify="space-between" mb="xs">
+                  <Group gap="xs">
+                    <ActionIcon variant="light" radius="md" color="teal">
+                      <IconAlertTriangle size={16} />
+                    </ActionIcon>
+                    <Text fw={800} className="hts-section-title">
+                      {t("settings.risk.preview_title")}
+                    </Text>
+                  </Group>
+                  <Badge variant="light" color="blue">
+                    UX
+                  </Badge>
+                </Group>
+
+                <Paper withBorder radius="md" p="sm">
+                  <Group justify="space-between">
+                    <Text size="sm" fw={700}>
+                      {t("settings.risk.trade_gate")}
+                    </Text>
+                    <Badge variant="light" color={s.blockTradingOnViolation ? "yellow" : "green"}>
+                      {s.blockTradingOnViolation ? t("settings.risk.strict") : t("settings.risk.open")}
                     </Badge>
                   </Group>
-                  <Text size="sm" c="dimmed" mt={6}>
-                    Strict mode locks ticket and disables market buttons on violation.
+                  <Text size="xs" c="dimmed" mt={6}>
+                    {t("settings.risk.strict_desc")}
                   </Text>
-                </Card>
+                </Paper>
 
-                <Card radius="lg" withBorder style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}>
+                <Paper withBorder radius="md" p="sm" mt="sm">
                   <Group justify="space-between">
-                    <Text fw={700}>Warnings</Text>
-                    <Badge variant="light" color={risk.showWarnings ? "blue" : "gray"}>
-                      {risk.showWarnings ? "ON" : "OFF"}
+                    <Text size="sm" fw={700}>
+                      {t("settings.risk.warnings")}
+                    </Text>
+                    <Badge variant="light" color={s.showWarningsEarly ? "blue" : "gray"}>
+                      {s.showWarningsEarly ? t("common.on") : t("common.off")}
                     </Badge>
                   </Group>
-                  <Text size="sm" c="dimmed" mt={6}>
-                    If enabled, UI shows near-limit badges and toasts.
+                  <Text size="xs" c="dimmed" mt={6}>
+                    {t("settings.risk.warnings_desc")}
                   </Text>
-                </Card>
-              </Stack>
-            </GlassCard>
-          </SimpleGrid>
-        </Tabs.Panel>
+                </Paper>
+              </Paper>
+            </SimpleGrid>
+          </Tabs.Panel>
 
-        {/* =================== NOTIFICATIONS =================== */}
-        <Tabs.Panel value="notifications" pt="md">
-          <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
-            <GlassCard title="Events" icon={<IconBell size={18} />} badge={<Badge variant="light">Toasts</Badge>}>
-              <Stack gap="sm">
-                <Switch checked={notify.orderPlaced} onChange={(e) => setNotify((n) => ({ ...n, orderPlaced: e.currentTarget.checked }))} label="Order placed" />
-                <Switch checked={notify.orderFilled} onChange={(e) => setNotify((n) => ({ ...n, orderFilled: e.currentTarget.checked }))} label="Order filled" />
-                <Switch checked={notify.sltpHit} onChange={(e) => setNotify((n) => ({ ...n, sltpHit: e.currentTarget.checked }))} label="SL/TP hit" />
-                <Switch checked={notify.riskWarnings} onChange={(e) => setNotify((n) => ({ ...n, riskWarnings: e.currentTarget.checked }))} label="Risk warnings" />
-                <Divider />
-                <Switch checked={notify.sound} onChange={(e) => setNotify((n) => ({ ...n, sound: e.currentTarget.checked }))} label="Sound alerts" />
-                <Switch checked={notify.desktop} onChange={(e) => setNotify((n) => ({ ...n, desktop: e.currentTarget.checked }))} label="Desktop notifications" />
-              </Stack>
-            </GlassCard>
+          {/* NOTIFICATIONS */}
+          <Tabs.Panel value="notifications" pt="md">
+            <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
+              <Paper withBorder radius="lg" p="md">
+                <Group justify="space-between" mb="xs">
+                  <Group gap="xs">
+                    <ActionIcon variant="light" radius="md" color="teal">
+                      <IconBell size={16} />
+                    </ActionIcon>
+                    <Text fw={800} className="hts-section-title">
+                      {t("settings.notifications.events_title")}
+                    </Text>
+                  </Group>
+                  <Badge variant="light" color="blue">
+                    TOASTS
+                  </Badge>
+                </Group>
 
-            <GlassCard title="Test notification" icon={<IconBell size={18} />} badge={<Badge variant="light">Demo</Badge>}>
-              <Stack gap="sm">
-                <Text size="sm" c="dimmed">
-                  Click to show a preview toast.
+                <Stack gap="sm">
+                  <Switch
+                    checked={s.nOrderPlaced}
+                    onChange={(e) => setS((p) => ({ ...p, nOrderPlaced: e.currentTarget.checked }))}
+                    label={t("settings.notifications.order_placed")}
+                  />
+                  <Switch
+                    checked={s.nOrderFilled}
+                    onChange={(e) => setS((p) => ({ ...p, nOrderFilled: e.currentTarget.checked }))}
+                    label={t("settings.notifications.order_filled")}
+                  />
+                  <Switch
+                    checked={s.nSLTPHit}
+                    onChange={(e) => setS((p) => ({ ...p, nSLTPHit: e.currentTarget.checked }))}
+                    label={t("settings.notifications.sltp_hit")}
+                  />
+                  <Switch
+                    checked={s.nRiskWarnings}
+                    onChange={(e) => setS((p) => ({ ...p, nRiskWarnings: e.currentTarget.checked }))}
+                    label={t("settings.notifications.risk_warnings")}
+                  />
+
+                  <Divider my="xs" />
+
+                  <Switch
+                    checked={s.nSoundAlerts}
+                    onChange={(e) => setS((p) => ({ ...p, nSoundAlerts: e.currentTarget.checked }))}
+                    label={t("settings.notifications.sound_alerts")}
+                  />
+                  <Switch
+                    checked={s.nDesktop}
+                    onChange={(e) => setS((p) => ({ ...p, nDesktop: e.currentTarget.checked }))}
+                    label={t("settings.notifications.desktop")}
+                  />
+                </Stack>
+              </Paper>
+
+              <Paper withBorder radius="lg" p="md">
+                <Group justify="space-between" mb="xs">
+                  <Group gap="xs">
+                    <ActionIcon variant="light" radius="md" color="teal">
+                      <IconBell size={16} />
+                    </ActionIcon>
+                    <Text fw={800} className="hts-section-title">
+                      {t("settings.notifications.test_title")}
+                    </Text>
+                  </Group>
+                  <Badge variant="light" color="blue">
+                    DEMO
+                  </Badge>
+                </Group>
+
+                <Text size="xs" c="dimmed" mb="sm">
+                  {t("settings.notifications.test_desc")}
                 </Text>
+
                 <Button
-                  leftSection={<IconCheck size={16} />}
+                  fullWidth
                   onClick={() =>
                     notifications.show({
-                      title: "Order filled",
-                      message: "XAUUSD BUY 0.10 @ 2034.16 (mock)",
-                      color: "green",
+                      title: t("settings.notifications.demo_toast_title"),
+                      message: t("settings.notifications.demo_toast_msg"),
+                      color: "blue",
+                      icon: <IconCheck size={18} />,
                     })
                   }
                 >
-                  Show toast
+                  {t("settings.notifications.show_toast")}
                 </Button>
-              </Stack>
-            </GlassCard>
-          </SimpleGrid>
-        </Tabs.Panel>
+              </Paper>
+            </SimpleGrid>
+          </Tabs.Panel>
 
-        {/* =================== SECURITY =================== */}
-        <Tabs.Panel value="security" pt="md">
-          <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
-            <GlassCard title="Security" icon={<IconLock size={18} />} badge={<Badge variant="light">Local</Badge>}>
-              <Stack gap="sm">
-                <NumberInput
-                  label="Auto lock after (minutes)"
-                  value={security.lockAfterMin}
-                  onChange={(v) => setSecurity((s) => ({ ...s, lockAfterMin: Number(v) || 0 }))}
-                  min={0}
-                  step={5}
-                />
-
-                <Switch
-                  checked={security.requireConfirmSensitive}
-                  onChange={(e) => setSecurity((s) => ({ ...s, requireConfirmSensitive: e.currentTarget.checked }))}
-                  label="Confirm sensitive actions"
-                  description="Reset, wipe data, account changes..."
-                />
-
-                <Switch
-                  checked={security.maskBalances}
-                  onChange={(e) => setSecurity((s) => ({ ...s, maskBalances: e.currentTarget.checked }))}
-                  label="Mask balances"
-                  description="Hide equity / P&L in public screens."
-                />
-
-                <Switch
-                  checked={security.allowClipboard}
-                  onChange={(e) => setSecurity((s) => ({ ...s, allowClipboard: e.currentTarget.checked }))}
-                  label="Allow clipboard"
-                  description="Copy ticket details / order id."
-                />
-              </Stack>
-            </GlassCard>
-
-            <GlassCard title="Session" icon={<IconShield size={18} />} badge={<Badge variant="light">Demo</Badge>}>
-              <Stack gap="sm">
-                <Card radius="lg" withBorder style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}>
-                  <Group justify="space-between">
-                    <Text fw={700}>2FA</Text>
-                    <Badge variant="light" color="yellow">Soon</Badge>
+          {/* SECURITY */}
+          <Tabs.Panel value="security" pt="md">
+            <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
+              <Paper withBorder radius="lg" p="md">
+                <Group justify="space-between" mb="xs">
+                  <Group gap="xs">
+                    <ActionIcon variant="light" radius="md" color="teal">
+                      <IconLock size={16} />
+                    </ActionIcon>
+                    <Text fw={800} className="hts-section-title">
+                      {t("settings.security.title")}
+                    </Text>
                   </Group>
-                  <Text size="sm" c="dimmed" mt={6}>
-                    Add TOTP / device binding when connecting real auth.
+                  <Badge variant="light" color="blue">
+                    LOCAL
+                  </Badge>
+                </Group>
+
+                <Stack gap="sm">
+                  <TextInput
+                    label={t("settings.security.auto_lock_minutes")}
+                    value={String(s.autoLockMinutes)}
+                    onChange={(e) =>
+                      setS((p) => ({
+                        ...p,
+                        autoLockMinutes: clamp(Number(e.currentTarget.value || 0), 0, 9999),
+                      }))
+                    }
+                  />
+
+                  <Switch
+                    checked={s.confirmSensitiveActions}
+                    onChange={(e) => setS((p) => ({ ...p, confirmSensitiveActions: e.currentTarget.checked }))}
+                    label={t("settings.security.confirm_sensitive")}
+                    description={t("settings.security.confirm_sensitive_desc")}
+                  />
+
+                  <Switch
+                    checked={s.maskBalances}
+                    onChange={(e) => setS((p) => ({ ...p, maskBalances: e.currentTarget.checked }))}
+                    label={t("settings.security.mask_balances")}
+                    description={t("settings.security.mask_balances_desc")}
+                  />
+
+                  <Switch
+                    checked={s.allowClipboard}
+                    onChange={(e) => setS((p) => ({ ...p, allowClipboard: e.currentTarget.checked }))}
+                    label={t("settings.security.allow_clipboard")}
+                    description={t("settings.security.allow_clipboard_desc")}
+                  />
+                </Stack>
+              </Paper>
+
+              <Paper withBorder radius="lg" p="md">
+                <Group justify="space-between" mb="xs">
+                  <Group gap="xs">
+                    <ActionIcon variant="light" radius="md" color="teal">
+                      <IconShield size={16} />
+                    </ActionIcon>
+                    <Text fw={800} className="hts-section-title">
+                      {t("settings.session.title")}
+                    </Text>
+                  </Group>
+                  <Badge variant="light" color="blue">
+                    DEMO
+                  </Badge>
+                </Group>
+
+                <Paper withBorder radius="md" p="sm">
+                  <Group justify="space-between">
+                    <Text fw={700} size="sm">
+                      2FA
+                    </Text>
+                    <Badge variant="light" color="yellow">
+                      {t("common.soon")}
+                    </Badge>
+                  </Group>
+                  <Text size="xs" c="dimmed" mt={6}>
+                    {t("settings.session.2fa_desc")}
                   </Text>
-                </Card>
+                </Paper>
 
                 <Button
-                  variant="light"
+                  fullWidth
+                  mt="sm"
                   leftSection={<IconLock size={16} />}
+                  variant="light"
                   onClick={() =>
                     notifications.show({
-                      title: "Locked (demo)",
-                      message: "In real app: redirect to lock screen / re-auth.",
+                      title: t("settings.session.locked_title"),
+                      message: t("settings.session.locked_msg"),
+                      color: "gray",
                     })
                   }
                 >
-                  Lock now
+                  {t("settings.session.lock_now")}
                 </Button>
-              </Stack>
-            </GlassCard>
-          </SimpleGrid>
-        </Tabs.Panel>
+              </Paper>
+            </SimpleGrid>
+          </Tabs.Panel>
 
-        {/* =================== SYNC =================== */}
-        <Tabs.Panel value="sync" pt="md">
-          <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
-            <GlassCard title="Cloud sync" icon={<IconCloud size={18} />} badge={<Badge variant="light">Later</Badge>}>
-              <Stack gap="sm">
-                <Text size="sm" c="dimmed">
-                  This is a frontend demo. Later you can sync settings to backend (user profile).
+          {/* SYNC */}
+          <Tabs.Panel value="sync" pt="md">
+            <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
+              <Paper withBorder radius="lg" p="md">
+                <Group justify="space-between" mb="xs">
+                  <Group gap="xs">
+                    <ActionIcon variant="light" radius="md" color="teal">
+                      <IconCloudUpload size={16} />
+                    </ActionIcon>
+                    <Text fw={800} className="hts-section-title">
+                      {t("settings.sync.title")}
+                    </Text>
+                  </Group>
+                  <Badge variant="light" color="blue">
+                    LATER
+                  </Badge>
+                </Group>
+
+                <Text size="xs" c="dimmed" mb="sm">
+                  {t("settings.sync.desc")}
                 </Text>
 
-                <Switch checked={true} readOnly label="Sync enabled (mock)" description="Will push local settings to server." />
+                <Switch
+                  checked={s.cloudSyncEnabled}
+                  onChange={(e) => setS((p) => ({ ...p, cloudSyncEnabled: e.currentTarget.checked }))}
+                  label={t("settings.sync.enabled")}
+                  description={t("settings.sync.enabled_desc")}
+                />
 
                 <Button
-                  leftSection={<IconCloud size={16} />}
+                  fullWidth
+                  mt="sm"
+                  leftSection={<IconCloudUpload size={16} />}
                   onClick={() =>
                     notifications.show({
-                      title: "Sync",
-                      message: "Mock sync OK. (Later: call /settings API)",
+                      title: t("settings.sync.toast_title"),
+                      message: t("settings.sync.toast_msg"),
                       color: "blue",
                     })
                   }
                 >
-                  Sync now
+                  {t("settings.sync.now")}
                 </Button>
-              </Stack>
-            </GlassCard>
+              </Paper>
 
-            <GlassCard title="Advanced" icon={<IconWand size={18} />} badge={<Badge variant="light">Dev</Badge>}>
-              <Stack gap="sm">
-                <Tooltip label="Demo: wipe local settings from storage" withArrow>
-                  <Button
-                    color="red"
-                    variant="light"
-                    onClick={() => {
-                      try {
-                        localStorage.removeItem("hts.settings.profile");
-                        localStorage.removeItem("hts.settings.appearance");
-                        localStorage.removeItem("hts.settings.trade");
-                        localStorage.removeItem("hts.settings.risk");
-                        localStorage.removeItem("hts.settings.notify");
-                        localStorage.removeItem("hts.settings.security");
-                      } catch {}
-                      resetAll();
-                    }}
-                  >
-                    Wipe local settings
-                  </Button>
-                </Tooltip>
+              <Paper withBorder radius="lg" p="md">
+                <Group justify="space-between" mb="xs">
+                  <Group gap="xs">
+                    <ActionIcon variant="light" radius="md" color="teal">
+                      <IconWand size={16} />
+                    </ActionIcon>
+                    <Text fw={800} className="hts-section-title">
+                      {t("settings.advanced.title")}
+                    </Text>
+                  </Group>
+                  <Badge variant="light" color="blue">
+                    DEV
+                  </Badge>
+                </Group>
 
-                <Text size="xs" c="dimmed">
-                  Note: This is safe because everything is demo + localStorage only.
+                <Button
+                  fullWidth
+                  color="red"
+                  variant="light"
+                  leftSection={<IconTrash size={16} />}
+                  onClick={wipeLocalSettings}
+                >
+                  {t("settings.advanced.wipe")}
+                </Button>
+
+                <Text size="xs" c="dimmed" mt="sm">
+                  {t("settings.advanced.note")}
                 </Text>
-              </Stack>
-            </GlassCard>
-          </SimpleGrid>
-        </Tabs.Panel>
-      </Tabs>
-    </Stack>
+              </Paper>
+            </SimpleGrid>
+          </Tabs.Panel>
+        </Tabs>
+      </Stack>
+    </Box>
   );
 }

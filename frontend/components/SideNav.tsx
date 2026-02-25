@@ -1,33 +1,47 @@
+// components/SideNav.tsx
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Stack, NavLink } from "@mantine/core";
-import { LayoutDashboard, LineChart, CandlestickChart, Wallet, Settings } from "lucide-react";
+import {
+  LayoutDashboard,
+  LineChart,
+  CandlestickChart,
+  Wallet,
+  Settings,
+} from "lucide-react";
+import { useI18n } from "@/lib/i18nProvider";
 
 const items = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/trading", label: "Trading", icon: CandlestickChart },
-  { href: "/markets", label: "Markets", icon: LineChart },
-  { href: "/portfolio", label: "Portfolio", icon: Wallet },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/", key: "nav.dashboard", fallback: "Dashboard", icon: LayoutDashboard },
+  { href: "/trading", key: "nav.trading", fallback: "Trading", icon: CandlestickChart },
+  { href: "/markets", key: "nav.markets", fallback: "Markets", icon: LineChart },
+  { href: "/portfolio", key: "nav.portfolio", fallback: "Portfolio", icon: Wallet },
+  { href: "/settings", key: "nav.settings", fallback: "Settings", icon: Settings },
 ];
 
 export function SideNav() {
   const pathname = usePathname();
+  const { t } = useI18n();
 
   return (
     <Stack gap={6}>
       {items.map((it) => {
         const Icon = it.icon;
+
+        // ✅ "/" với Next navigation: có lúc pathname là "" hoặc null (tuỳ phiên bản)
+        const active =
+          it.href === "/" ? pathname === "/" || pathname === "" : pathname === it.href;
+
         return (
           <NavLink
             key={it.href}
-            component={Link}
+            component={Link as any}
             href={it.href}
-            label={it.label}
+            label={t(it.key) || it.fallback}
             leftSection={<Icon size={18} />}
-            active={pathname === it.href}
+            active={active}
           />
         );
       })}

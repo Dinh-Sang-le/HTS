@@ -19,10 +19,47 @@
   }
 }
 
-body {
+html,body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+html,
+body {
+  background: var(--mantine-color-body) !important;
+  color: var(--mantine-color-text) !important;
+}
+
+/* Nếu bạn có wrapper layout riêng, thêm nó ở đây */
+.mantine-AppShell-main,
+.mantine-AppShell-header,
+.mantine-AppShell-navbar {
+  background: var(--mantine-color-body) !important;
+}
+
+.hts-icon:hover {
+  transform: translateY(-1px);
+}
+
+:root[data-mantine-color-scheme="light"] .hts-icon:hover {
+  background: var(--mantine-color-default-hover);
+}
+
+:root[data-mantine-color-scheme="dark"] .hts-icon:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Light mode: sạch */
+:root[data-mantine-color-scheme="light"] .mantine-AppShell-main {
+  background: var(--mantine-color-body) !important;
+}
+
+/* Dark mode: cho phép gradient (optional) */
+:root[data-mantine-color-scheme="dark"] .mantine-AppShell-main {
+  background:
+    radial-gradient(1200px 600px at 20% 0%, rgba(59, 130, 246, 0.10), transparent 55%),
+    var(--mantine-color-body) !important;
 }
 /* ===== HTS Pro background ===== */
 .hts-bg {
@@ -791,4 +828,808 @@ body::after {
     drop-shadow(0 0 10px rgba(255,0,120,0.25));
 
   transition: filter .3s ease;
+}
+/* ===== Brand Gradient Text ===== */
+
+.hts-brand-text {
+  white-space: nowrap;
+  letter-spacing: 0.6px;
+  position: relative;
+
+  background: linear-gradient(90deg, #ffffff 0%, #9ecbff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+
+  transition: all 0.3s ease;
+}
+
+/* 🌙 DARK MODE */
+:root[data-mantine-color-scheme="dark"] .hts-brand-text {
+  background: linear-gradient(90deg, #ffffff 0%, #9ecbff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+
+  text-shadow:
+    0 0 8px rgba(59, 130, 246, 0.45),
+    0 0 18px rgba(59, 130, 246, 0.25);
+}
+
+/* ☀ LIGHT MODE */
+:root[data-mantine-color-scheme="light"] .hts-brand-text {
+  background: linear-gradient(90deg, #111827 0%, #2563eb 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+
+  text-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.08),
+    0 2px 6px rgba(37, 99, 235, 0.15);
+}
+
+/* ✨ Hover subtle lift */
+.hts-brand-text:hover {
+  transform: translateY(-1px);
+}
+
+/* ✅ Light mode: đổi toàn bộ text mặc định (đang đen) sang #4f9078 */
+:root[data-mantine-color-scheme="light"] {
+  --mantine-color-text: #4f9078;
+}
+
+/* (tuỳ chọn) các text “dimmed” cũng xanh nhạt hơn */
+:root[data-mantine-color-scheme="light"] {
+  --mantine-color-dimmed: rgba(0, 0, 0, 0.75);
+}
+
+/* ===== Force light mode to never show dark patches ===== */
+:root[data-mantine-color-scheme="light"] html,
+:root[data-mantine-color-scheme="light"] body {
+  background: var(--mantine-color-body) !important;
+  color: var(--mantine-color-text) !important;
+}
+
+/* AppShell areas */
+:root[data-mantine-color-scheme="light"] .mantine-AppShell-main,
+:root[data-mantine-color-scheme="light"] .mantine-AppShell-header,
+:root[data-mantine-color-scheme="light"] .mantine-AppShell-navbar {
+  background: var(--mantine-color-body) !important;
+}
+
+/* Các “panel/card” custom hay bị set nền tối */
+:root[data-mantine-color-scheme="light"] .hts-panel,
+:root[data-mantine-color-scheme="light"] .hts-card,
+:root[data-mantine-color-scheme="light"] .hts-surface,
+:root[data-mantine-color-scheme="light"] .panel,
+:root[data-mantine-color-scheme="light"] .card,
+:root[data-mantine-color-scheme="light"] .surface {
+  background: var(--mantine-color-body) !important;
+}
+
+/* Nếu vùng đen là container chart hoặc wrapper */
+:root[data-mantine-color-scheme="light"] .hts-chartWrap,
+:root[data-mantine-color-scheme="light"] .tv-chart,
+:root[data-mantine-color-scheme="light"] .tradingview-widget-container,
+:root[data-mantine-color-scheme="light"] .chart-container {
+  background: var(--mantine-color-body) !important;
+}
+
+
+/* ===== FIX gray gradient Grid blocks in LIGHT mode ===== */
+:root[data-mantine-color-scheme="light"]
+.mantine-SimpleGrid-root > div[style*="linear-gradient"] {
+  background: var(--mantine-color-body) !important;
+}
+
+:root[data-mantine-color-scheme="light"] .hts-dom,
+:root[data-mantine-color-scheme="light"] .dom-ladder,
+:root[data-mantine-color-scheme="light"] .depth-ladder {
+  background: linear-gradient(
+    rgba(255,255,255,0.96),
+    rgba(255,255,255,0.90)
+  ) !important;
+  border: 1px solid rgba(0,0,0,0.08);
+}
+
+/* ===== FIX: Paper nền đen (linear-gradient) trong LIGHT mode ===== */
+:root[data-mantine-color-scheme="light"]
+.mantine-Paper-root[style*="linear-gradient(rgba(20, 20, 20"] {
+  background: linear-gradient(rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.90)) !important;
+}
+
+/* ===== DOM Ladder: bar không che chữ ===== */
+.hts-dom-row {
+  position: relative;
+  overflow: hidden;
+}
+
+/* bar nằm dưới */
+.hts-dom-bar {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+
+  /* ✅ chừa chỗ cho chữ bên phải (qty) + bên trái (ASK) */
+  width: calc(100% - 90px) !important;  /* chỉnh 90/120/150 tùy layout */
+  max-width: calc(100% - 120px) !important;
+
+  pointer-events: none;
+}
+
+/* chữ luôn nổi */
+.hts-dom-text,
+.hts-dom-row * {
+  position: relative;
+  z-index: 2;
+}
+
+/* Ask (đỏ) mịn hơn */
+.hts-dom-row.ask .hts-dom-bar {
+  background: linear-gradient(to right, rgba(239,68,68,0.30), rgba(239,68,68,0.12));
+}
+
+/* Bid (xanh) mịn hơn */
+.hts-dom-row.bid .hts-dom-bar {
+  background: linear-gradient(to right, rgba(16,185,129,0.30), rgba(16,185,129,0.12));
+}
+
+/* thêm line mỏng phân cách */
+.hts-dom-row {
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+:root[data-mantine-color-scheme="dark"] .hts-dom-row {
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+/* ===== Positions panel shadow (Mantine Paper) ===== */
+/* Target Paper có border trong khu Positions */
+:root[data-mantine-color-scheme="dark"]
+.mantine-Paper-root[data-with-border="true"] {
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(59, 130, 246, 0.10),
+    0 0 26px rgba(59, 130, 246, 0.16);
+  transition: box-shadow 180ms ease, transform 180ms ease;
+}
+
+/* hover nâng nhẹ */
+:root[data-mantine-color-scheme="dark"]
+.mantine-Paper-root[data-with-border="true"]:hover {
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.62),
+    0 0 0 1px rgba(59, 130, 246, 0.14),
+    0 0 34px rgba(59, 130, 246, 0.22);
+  transform: translateY(-1px);
+}
+
+/* ☀ Light mode shadow mềm */
+:root[data-mantine-color-scheme="light"]
+.mantine-Paper-root[data-with-border="true"] {
+  box-shadow:
+    0 14px 28px rgba(0, 0, 0, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 180ms ease, transform 180ms ease;
+}
+
+:root[data-mantine-color-scheme="light"]
+.mantine-Paper-root[data-with-border="true"]:hover {
+  box-shadow:
+    0 18px 36px rgba(0, 0, 0, 0.11),
+    0 4px 10px rgba(0, 0, 0, 0.07);
+  transform: translateY(-1px);
+}
+
+/* ===== Positions Panel Shadow ===== */
+.hts-positions-panel {
+  transition: all 200ms ease;
+}
+
+/* 🌙 DARK */
+:root[data-mantine-color-scheme="dark"] .hts-positions-panel {
+  box-shadow:
+    0 16px 40px rgba(0,0,0,0.55),
+    0 0 0 1px rgba(59,130,246,0.10),
+    0 0 28px rgba(59,130,246,0.18);
+}
+
+/* hover dark */
+:root[data-mantine-color-scheme="dark"]
+.hts-positions-panel:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 22px 50px rgba(0,0,0,0.65),
+    0 0 0 1px rgba(59,130,246,0.16),
+    0 0 36px rgba(59,130,246,0.25);
+}
+
+/* ☀ LIGHT */
+:root[data-mantine-color-scheme="light"] .hts-positions-panel {
+  box-shadow:
+    0 14px 30px rgba(0,0,0,0.08),
+    0 4px 10px rgba(0,0,0,0.05);
+}
+
+/* hover light */
+:root[data-mantine-color-scheme="light"]
+.hts-positions-panel:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 20px 40px rgba(0,0,0,0.12),
+    0 6px 14px rgba(0,0,0,0.08);
+}
+
+
+/* ===== Positions row glow ===== */
+.hts-position-row {
+  position: relative;
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+/* nhẹ thôi, hover mới nổi */
+:root[data-mantine-color-scheme="dark"] .hts-position-row:hover {
+  transform: translateY(-1px);
+  background: rgba(255,255,255,0.03);
+}
+
+:root[data-mantine-color-scheme="light"] .hts-position-row:hover {
+  transform: translateY(-1px);
+  background: rgba(79,144,120,0.06);
+}
+
+/* 💚 PROFIT glow */
+:root[data-mantine-color-scheme="dark"] .hts-position-row[data-profit="1"]:hover {
+  box-shadow:
+    inset 0 0 0 1px rgba(16,185,129,0.14),
+    0 10px 22px rgba(0,0,0,0.35),
+    0 0 18px rgba(16,185,129,0.18);
+}
+
+:root[data-mantine-color-scheme="light"] .hts-position-row[data-profit="1"]:hover {
+  box-shadow:
+    inset 0 0 0 1px rgba(16,185,129,0.18),
+    0 10px 22px rgba(0,0,0,0.10),
+    0 0 16px rgba(16,185,129,0.14);
+}
+
+/* 🔥 LOSS glow */
+:root[data-mantine-color-scheme="dark"] .hts-position-row[data-loss="1"]:hover {
+  box-shadow:
+    inset 0 0 0 1px rgba(239,68,68,0.16),
+    0 10px 22px rgba(0,0,0,0.35),
+    0 0 18px rgba(239,68,68,0.20);
+}
+
+:root[data-mantine-color-scheme="light"] .hts-position-row[data-loss="1"]:hover {
+  box-shadow:
+    inset 0 0 0 1px rgba(239,68,68,0.18),
+    0 10px 22px rgba(0,0,0,0.10),
+    0 0 16px rgba(239,68,68,0.14);
+}
+
+/* ===== Panel pulse on new position ===== */
+@keyframes hts-panel-pulse-dark {
+  0% {
+    box-shadow:
+      0 16px 40px rgba(0,0,0,0.55),
+      0 0 0 1px rgba(59,130,246,0.10),
+      0 0 28px rgba(59,130,246,0.18);
+  }
+  50% {
+    box-shadow:
+      0 18px 46px rgba(0,0,0,0.62),
+      0 0 0 1px rgba(59,130,246,0.22),
+      0 0 44px rgba(59,130,246,0.34);
+  }
+  100% {
+    box-shadow:
+      0 16px 40px rgba(0,0,0,0.55),
+      0 0 0 1px rgba(59,130,246,0.10),
+      0 0 28px rgba(59,130,246,0.18);
+  }
+}
+
+@keyframes hts-panel-pulse-light {
+  0% {
+    box-shadow:
+      0 14px 30px rgba(0,0,0,0.08),
+      0 4px 10px rgba(0,0,0,0.05);
+  }
+  50% {
+    box-shadow:
+      0 18px 40px rgba(0,0,0,0.12),
+      0 8px 14px rgba(0,0,0,0.08);
+  }
+  100% {
+    box-shadow:
+      0 14px 30px rgba(0,0,0,0.08),
+      0 4px 10px rgba(0,0,0,0.05);
+  }
+}
+
+/* kích hoạt pulse */
+:root[data-mantine-color-scheme="dark"] .hts-positions-panel.is-pulse {
+  animation: hts-panel-pulse-dark 420ms ease-out;
+}
+
+:root[data-mantine-color-scheme="light"] .hts-positions-panel.is-pulse {
+  animation: hts-panel-pulse-light 420ms ease-out;
+}
+
+/* ===========================
+   LOGIN (fintech + tech)
+=========================== */
+.hts-login {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.hts-login-inner {
+  position: relative;
+  z-index: 2;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 28px 18px;
+}
+
+/* Background layers */
+.hts-login-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* grid pattern */
+.hts-login-grid {
+  position: absolute;
+  inset: -20%;
+  opacity: 0.22;
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-size: 46px 46px;
+  transform: rotate(-10deg);
+  filter: blur(0px);
+}
+
+/* glows */
+.hts-login-glow {
+  position: absolute;
+  width: 680px;
+  height: 680px;
+  border-radius: 999px;
+  filter: blur(60px);
+  opacity: 0.75;
+  animation: htsGlowFloat 8s ease-in-out infinite;
+}
+
+.hts-login-glow-a {
+  left: -120px;
+  top: -120px;
+}
+
+.hts-login-glow-b {
+  right: -160px;
+  bottom: -180px;
+  animation-delay: 1.6s;
+}
+
+/* pulse line (market vibe) */
+.hts-login-pulse {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: 52%;
+  height: 2px;
+  opacity: 0.35;
+  background: linear-gradient(90deg, transparent, rgba(59,130,246,0.9), transparent);
+  filter: blur(0.2px);
+  animation: htsPulse 2.8s ease-in-out infinite;
+}
+
+/* brand */
+.hts-login-brand {
+  user-select: none;
+}
+
+.hts-login-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  letter-spacing: 0.4px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.06);
+  box-shadow: 0 14px 28px rgba(0,0,0,0.22);
+}
+
+/* Card */
+.hts-login-card {
+  width: min(440px, 92vw);
+  border-radius: 16px !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Primary button */
+.hts-login-primary {
+  border-radius: 12px !important;
+  font-weight: 800 !important;
+}
+
+/* Animations */
+@keyframes htsGlowFloat {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(18px, -16px) scale(1.02); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes htsPulse {
+  0%   { transform: translateX(-10%); opacity: 0.20; }
+  50%  { transform: translateX(10%); opacity: 0.42; }
+  100% { transform: translateX(-10%); opacity: 0.20; }
+}
+
+/* ===========================
+   THEME: DARK / LIGHT
+=========================== */
+:root[data-mantine-color-scheme="dark"] .hts-login {
+  background: radial-gradient(1200px 700px at 20% 10%, rgba(59,130,246,0.20), transparent 55%),
+              radial-gradient(900px 560px at 90% 90%, rgba(168,85,247,0.14), transparent 55%),
+              #0b0e14;
+}
+
+:root[data-mantine-color-scheme="dark"] .hts-login-glow-a {
+  background: radial-gradient(circle at 30% 30%, rgba(59,130,246,0.60), transparent 60%);
+}
+
+:root[data-mantine-color-scheme="dark"] .hts-login-glow-b {
+  background: radial-gradient(circle at 30% 30%, rgba(168,85,247,0.45), transparent 62%);
+}
+
+:root[data-mantine-color-scheme="dark"] .hts-login-card {
+  background: rgba(10, 12, 18, 0.58) !important;
+  border-color: rgba(255,255,255,0.10) !important;
+  box-shadow:
+    0 22px 60px rgba(0,0,0,0.60),
+    0 0 0 1px rgba(59,130,246,0.12),
+    0 0 34px rgba(59,130,246,0.18);
+}
+
+/* Light */
+:root[data-mantine-color-scheme="light"] .hts-login {
+  background: radial-gradient(1200px 700px at 20% 10%, rgba(37,99,235,0.10), transparent 55%),
+              radial-gradient(900px 560px at 90% 90%, rgba(79,144,120,0.10), transparent 55%),
+              #f6f8fb;
+}
+
+:root[data-mantine-color-scheme="light"] .hts-login-grid {
+  opacity: 0.18;
+  background-image:
+    linear-gradient(to right, rgba(17,24,39,0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(17,24,39,0.06) 1px, transparent 1px);
+}
+
+:root[data-mantine-color-scheme="light"] .hts-login-glow-a {
+  background: radial-gradient(circle at 30% 30%, rgba(37,99,235,0.22), transparent 62%);
+}
+:root[data-mantine-color-scheme="light"] .hts-login-glow-b {
+  background: radial-gradient(circle at 30% 30%, rgba(79,144,120,0.18), transparent 66%);
+}
+
+:root[data-mantine-color-scheme="light"] .hts-login-badge {
+  border: 1px solid rgba(0,0,0,0.10);
+  background: rgba(255,255,255,0.70);
+  box-shadow: 0 18px 34px rgba(0,0,0,0.08);
+}
+
+:root[data-mantine-color-scheme="light"] .hts-login-card {
+  background: rgba(255,255,255,0.78) !important;
+  border-color: rgba(0,0,0,0.08) !important;
+  box-shadow:
+    0 18px 44px rgba(0,0,0,0.10),
+    0 1px 0 rgba(255,255,255,0.60) inset;
+}
+
+/* ===========================
+   LOGIN (fintech + tech)
+=========================== */
+.hts-login {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.hts-login-inner {
+  position: relative;
+  z-index: 2;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 28px 18px;
+}
+
+.hts-login-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.hts-login-grid {
+  position: absolute;
+  inset: -20%;
+  opacity: 0.22;
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-size: 46px 46px;
+  transform: rotate(-10deg);
+}
+
+.hts-login-glow {
+  position: absolute;
+  width: 680px;
+  height: 680px;
+  border-radius: 999px;
+  filter: blur(60px);
+  opacity: 0.75;
+  animation: htsGlowFloat 8s ease-in-out infinite;
+}
+
+.hts-login-glow-a { left: -120px; top: -120px; }
+.hts-login-glow-b { right: -160px; bottom: -180px; animation-delay: 1.6s; }
+
+.hts-login-pulse {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: 52%;
+  height: 2px;
+  opacity: 0.35;
+  background: linear-gradient(90deg, transparent, rgba(59,130,246,0.9), transparent);
+  animation: htsPulse 2.8s ease-in-out infinite;
+}
+
+.hts-login-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  letter-spacing: 0.4px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.06);
+  box-shadow: 0 14px 28px rgba(0,0,0,0.22);
+}
+
+.hts-login-card {
+  width: min(440px, 92vw);
+  border-radius: 16px !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.hts-login-primary {
+  border-radius: 12px !important;
+  font-weight: 800 !important;
+}
+
+@keyframes htsGlowFloat {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(18px, -16px) scale(1.02); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes htsPulse {
+  0% { transform: translateX(-10%); opacity: 0.20; }
+  50% { transform: translateX(10%); opacity: 0.42; }
+  100% { transform: translateX(-10%); opacity: 0.20; }
+}
+
+/* DARK */
+:root[data-mantine-color-scheme="dark"] .hts-login {
+  background:
+    radial-gradient(1200px 700px at 20% 10%, rgba(59,130,246,0.20), transparent 55%),
+    radial-gradient(900px 560px at 90% 90%, rgba(168,85,247,0.14), transparent 55%),
+    #0b0e14;
+}
+
+:root[data-mantine-color-scheme="dark"] .hts-login-glow-a {
+  background: radial-gradient(circle at 30% 30%, rgba(59,130,246,0.60), transparent 60%);
+}
+:root[data-mantine-color-scheme="dark"] .hts-login-glow-b {
+  background: radial-gradient(circle at 30% 30%, rgba(168,85,247,0.45), transparent 62%);
+}
+:root[data-mantine-color-scheme="dark"] .hts-login-card {
+  background: rgba(10, 12, 18, 0.58) !important;
+  border-color: rgba(255,255,255,0.10) !important;
+  box-shadow:
+    0 22px 60px rgba(0,0,0,0.60),
+    0 0 0 1px rgba(59,130,246,0.12),
+    0 0 34px rgba(59,130,246,0.18);
+}
+
+/* LIGHT */
+:root[data-mantine-color-scheme="light"] .hts-login {
+  background:
+    radial-gradient(1200px 700px at 20% 10%, rgba(37,99,235,0.10), transparent 55%),
+    radial-gradient(900px 560px at 90% 90%, rgba(79,144,120,0.10), transparent 55%),
+    #f6f8fb;
+}
+:root[data-mantine-color-scheme="light"] .hts-login-grid {
+  opacity: 0.18;
+  background-image:
+    linear-gradient(to right, rgba(17,24,39,0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(17,24,39,0.06) 1px, transparent 1px);
+}
+:root[data-mantine-color-scheme="light"] .hts-login-glow-a {
+  background: radial-gradient(circle at 30% 30%, rgba(37,99,235,0.22), transparent 62%);
+}
+:root[data-mantine-color-scheme="light"] .hts-login-glow-b {
+  background: radial-gradient(circle at 30% 30%, rgba(79,144,120,0.18), transparent 66%);
+}
+:root[data-mantine-color-scheme="light"] .hts-login-badge {
+  border: 1px solid rgba(0,0,0,0.10);
+  background: rgba(255,255,255,0.70);
+  box-shadow: 0 18px 34px rgba(0,0,0,0.08);
+}
+:root[data-mantine-color-scheme="light"] .hts-login-card {
+  background: rgba(255,255,255,0.78) !important;
+  border-color: rgba(0,0,0,0.08) !important;
+  box-shadow:
+    0 18px 44px rgba(0,0,0,0.10),
+    0 1px 0 rgba(255,255,255,0.60) inset;
+}
+
+/* ===========================
+   Corporate Fintech User Menu
+=========================== */
+
+/* nút user ở topbar */
+.hts-userbtn {
+  border-radius: 12px;
+  padding: 6px 10px;
+  transition: all 160ms ease;
+  user-select: none;
+}
+
+.hts-usermeta {
+  display: none;
+}
+
+.hts-username {
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.hts-userrole {
+  font-size: 10px;
+  opacity: 0.7;
+  line-height: 1.1;
+  margin-top: 2px;
+}
+
+.hts-userchev {
+  opacity: 0.75;
+}
+
+/* hiển thị meta ở màn rộng */
+@media (min-width: 980px) {
+  .hts-usermeta {
+    display: block;
+    min-width: 120px;
+  }
+}
+
+/* hover */
+:root[data-mantine-color-scheme="dark"] .hts-userbtn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+
+:root[data-mantine-color-scheme="light"] .hts-userbtn:hover {
+  background: rgba(0, 0, 0, 0.04);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.10);
+}
+
+/* dropdown glass */
+.hts-user-menu {
+  border-radius: 14px !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* dark dropdown */
+:root[data-mantine-color-scheme="dark"] .hts-user-menu {
+  background: rgba(18, 22, 30, 0.88) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.65),
+    0 0 26px rgba(59, 130, 246, 0.18);
+}
+
+/* light dropdown */
+:root[data-mantine-color-scheme="light"] .hts-user-menu {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.12);
+}
+
+
+/* ===== Login background image layer ===== */
+.hts-login-bgimg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  transform: scale(1.02);
+  filter: saturate(1.05);
+}
+
+/* overlay để card nổi và chữ đọc rõ */
+.hts-login-overlay {
+  background: transparent;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+/* Dark uses bg-dark.jpg */
+:root[data-mantine-color-scheme="dark"] .hts-login-bgimg {
+  background-image: url("../public/login/bg-dark.jpg");
+}
+
+:root[data-mantine-color-scheme="dark"] .hts-login-overlay {
+  background:
+    radial-gradient(900px 520px at 18% 18%, rgba(59,130,246,0.12), transparent 60%),
+    linear-gradient(90deg, rgba(9,11,18,0.18), rgba(9,11,18,0.08) 40%, rgba(9,11,18,0.00));
+}
+
+/* Light uses bg-light.jpg */
+:root[data-mantine-color-scheme="light"] .hts-login-bgimg {
+  background-image: url("../public/login/bg-light.jpg");
+}
+
+:root[data-mantine-color-scheme="light"] .hts-login-overlay {
+  background:
+    radial-gradient(900px 520px at 18% 18%, rgba(37,99,235,0.08), transparent 60%),
+    linear-gradient(90deg, rgba(246,248,251,0.18), rgba(246,248,251,0.08) 45%, rgba(246,248,251,0.00));
+}
+
+.mantine-NavLink-root {
+  font-size: 20px !important;   /* mặc định thường ~14px */
+  font-weight: 600;             /* nhìn chắc hơn */
+}
+
+.mantine-NavLink-label {
+  font-size: 16px !important;
+}
+
+.mantine-NavLink-section svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ===== Fix Settings black background in LIGHT mode ===== */
+:root[data-mantine-color-scheme="light"] .hts-settings-page .mantine-Paper-root {
+  background: var(--mantine-color-body) !important;
+}
+
+/* nếu có panel nào dùng inline background gradient */
+:root[data-mantine-color-scheme="light"] .hts-settings-page [style*="background: linear-gradient"] {
+  background: var(--mantine-color-body) !important;
+}
+
+/* nếu có blur overlay */
+:root[data-mantine-color-scheme="light"] .hts-settings-page [style*="backdrop-filter"] {
+  backdrop-filter: none !important;
 }
