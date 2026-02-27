@@ -301,7 +301,7 @@ All trade logic runs client-side using a mock execution engine.
 
 # ⚠️ Disclaimer
 
-This project is a **paper trading simulator only**.
+This project is a **trading simulator only**.
 
 It does NOT:
 
@@ -309,7 +309,7 @@ It does NOT:
 - Execute real financial trades
 - Handle real funds
 
-For educational and simulation purposes only.
+For and simulation purposes only.
 
 ---
 
