@@ -47,6 +47,7 @@ import { useI18n } from "@/lib/i18nProvider";
 
 type ThemeMode = "dark" | "light" | "system";
 type Accent = "blue" | "green" | "purple" | "orange";
+type MantineAccent = "blue" | "green" | "violet" | "orange";
 
 const LS_SETTINGS = "hts-settings-v1";
 
@@ -153,6 +154,11 @@ function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
 }
 
+// ✅ Mantine không có "purple" => map sang "violet"
+function accentToMantine(a: Accent): MantineAccent {
+  return a === "purple" ? "violet" : a;
+}
+
 export default function SettingsPage() {
   const { locale, setLocale, t } = useI18n();
 
@@ -194,7 +200,6 @@ export default function SettingsPage() {
     setS((prev) => ({ ...prev, locale }));
   }, [locale]);
 
-  // ✅ có JA
   const languageData = useMemo(
     () => [
       { value: "vi", label: "Tiếng Việt" },
@@ -230,9 +235,7 @@ export default function SettingsPage() {
 
   const applyThemeAndAccent = (themeMode: ThemeMode, accent: Accent) => {
     if (themeMode === "dark" || themeMode === "light") {
-      window.dispatchEvent(
-        new CustomEvent("hts-theme-changed", { detail: themeMode })
-      );
+      window.dispatchEvent(new CustomEvent("hts-theme-changed", { detail: themeMode }));
     }
     window.dispatchEvent(new CustomEvent("hts-accent-changed", { detail: accent }));
   };
@@ -291,7 +294,9 @@ export default function SettingsPage() {
               <Badge variant="light" color="blue">
                 HTS
               </Badge>
-              <Badge variant="light" color="orange">
+
+              {/* ✅ FIX: badge đổi đúng màu accent */}
+              <Badge variant="light" color={accentToMantine(s.accent)}>
                 {String(s.accent).toUpperCase()}
               </Badge>
             </Group>
@@ -456,7 +461,9 @@ export default function SettingsPage() {
                       {t("settings.appearance.theme_title")}
                     </Text>
                   </Group>
-                  <Badge variant="light" color="orange">
+
+                  {/* ✅ FIX: badge đổi đúng màu */}
+                  <Badge variant="light" color={accentToMantine(s.accent)}>
                     {String(s.accent).toUpperCase()}
                   </Badge>
                 </Group>
@@ -477,9 +484,11 @@ export default function SettingsPage() {
                     ]}
                   />
 
+                  {/* ✅ FIX: tab accent đổi đúng màu (không còn cam mọi lựa chọn) */}
                   <SegmentedControl
                     fullWidth
                     value={s.accent}
+                    color={accentToMantine(s.accent)}
                     onChange={(v) => setS((p) => ({ ...p, accent: v as Accent }))}
                     data={[
                       { value: "blue", label: t("settings.appearance.accent_blue") },

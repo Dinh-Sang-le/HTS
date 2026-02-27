@@ -661,6 +661,58 @@ const ko: Record<string, string> = {
   "web3.tx.erc20_sent": "{symbol} tx: {hash}",
 
   "web3.footer_safe": "앱은 개인키/시드를 저장하지 않습니다. MetaMask가 서명합니다. 안전한 데모입니다.",
+
+  "login.page_title": "로그인",
+  "login.title": "로그인",
+  "login.desc": "계속하려면 인증해 주세요.",
+  "login.subtitle": "보안 접속 • 실시간 분석 • 실행 준비 UI",
+
+  "login.username_label": "아이디",
+  "login.username_ph": "admin",
+  "login.password_label": "비밀번호",
+  "login.password_ph": "123456",
+  "login.remember": "로그인 상태 유지",
+  "login.forgot": "비밀번호를 잊으셨나요?",
+  "login.cta": "계속",
+  "login.demo": "데모 계정: admin / 123456",
+
+  "login.ok_title": "접근 허용",
+  "login.ok_msg": "Home Trading System에 오신 것을 환영합니다",
+  "login.fail_title": "인증 실패",
+  "login.fail_msg": "아이디 또는 비밀번호가 올바르지 않습니다",
+  "login.no_account": "계정이 없으신가요?",
+  "login.create_one": "회원가입",
+
+  // Settings (sample)
+  "settings.theme": "테마",
+  "settings.theme_dark": "다크",
+  "settings.theme_light": "라이트",
+
+  "register.title": "계정 생성",
+  "register.desc": "프론트엔드 데모 (localStorage에 저장).",
+  "register.username_label": "사용자 이름",
+  "register.username_ph": "예: trader01",
+  "register.email_label": "이메일",
+  "register.email_ph": "you@company.com",
+  "register.password_label": "비밀번호",
+  "register.password_ph": "최소 6자",
+  "register.confirm_label": "비밀번호 확인",
+  "register.confirm_ph": "비밀번호 다시 입력",
+  "register.cta": "계정 만들기",
+  "register.have_account": "이미 계정이 있나요?",
+  "register.signin": "로그인",
+  "register.note": "참고: 이것은 프론트엔드 데모입니다. 사용자는 localStorage에 저장됩니다.",
+
+  "register.ok_title": "등록 완료",
+  "register.ok_msg": "계정이 생성되었습니다. 이제 로그인할 수 있습니다.",
+
+  "register.err_title": "입력이 올바르지 않습니다",
+  "register.err_username": "사용자 이름은 최소 3자 이상이어야 합니다.",
+  "register.err_email": "유효한 이메일을 입력하세요.",
+  "register.err_password": "비밀번호는 최소 6자 이상이어야 합니다.",
+  "register.err_confirm": "비밀번호 확인이 일치하지 않습니다.",
+  "register.err_username_exists": "이미 존재하는 사용자 이름입니다. 다른 이름을 선택하세요.",
+  "register.err_email_exists": "이미 존재하는 이메일입니다. 다른 이메일을 사용하세요."
 };
 
 const vi: Record<string, string> = {
@@ -678,7 +730,24 @@ const vi: Record<string, string> = {
     "Modern settings page (demo). No charts — only controls, preferences, and UX.",
   "settings.language": "Language",
   "settings.language_hint": "Applied language.",
+     "login.page_title": "Đăng nhập",
+  "login.title": "Đăng nhập",
+  "login.desc": "Vui lòng xác thực để tiếp tục.",
+  "login.subtitle": "Truy cập an toàn • Phân tích realtime • Giao diện sẵn sàng giao dịch",
 
+  "login.username_label": "Tên đăng nhập",
+  "login.username_ph": "admin",
+  "login.password_label": "Mật khẩu",
+  "login.password_ph": "123456",
+  "login.remember": "Ghi nhớ đăng nhập",
+  "login.forgot": "Quên mật khẩu?",
+  "login.cta": "Tiếp tục",
+  "login.demo": "Tài khoản demo: admin / 123456",
+
+  "login.ok_title": "Đăng nhập thành công",
+  "login.ok_msg": "Chào mừng bạn đến Home Trading System",
+  "login.fail_title": "Đăng nhập thất bại",
+  "login.fail_msg": "Sai tên đăng nhập hoặc mật khẩu",
   "settings.tab.general": "General",
   "settings.tab.appearance": "Appearance",
   "settings.tab.trading": "Trading",
@@ -700,6 +769,24 @@ const en: Record<string, string> = {
   "nav.markets": "Markets",
   "nav.portfolio": "Portfolio",
   "nav.settings": "Settings",
+  "login.page_title": "Sign in",
+  "login.title": "Sign in",
+  "login.desc": "Please authenticate to continue.",
+  "login.subtitle": "Secure access • Real-time analytics • Execution-ready UI",
+
+  "login.username_label": "Username",
+  "login.username_ph": "admin",
+  "login.password_label": "Password",
+  "login.password_ph": "123456",
+  "login.remember": "Remember me",
+  "login.forgot": "Forgot password?",
+  "login.cta": "Continue",
+  // "login.demo": "Demo account: admin / 123456",
+
+  "login.ok_title": "Access Granted",
+  "login.ok_msg": "Welcome to Home Trading System",
+  "login.fail_title": "Authentication Failed",
+  "login.fail_msg": "Invalid username or password",
 
   "common.save": "Save",
   "common.reset": "Reset",
@@ -1326,6 +1413,34 @@ const en: Record<string, string> = {
   "web3.tx.erc20_sent": "{symbol} tx: {hash}",
 
   "web3.footer_safe": "The app does not store private keys/seed. MetaMask signs transactions. Safe demo.",
+  "login.no_account": "No account?",
+  "login.create_one": "Create one",
+
+  "register.title": "Create account",
+  "register.desc": "Frontend demo (stored in localStorage).",
+  "register.username_label": "Username",
+  "register.username_ph": "e.g. trader01",
+  "register.email_label": "Email",
+  "register.email_ph": "you@company.com",
+  "register.password_label": "Password",
+  "register.password_ph": "Minimum 6 characters",
+  "register.confirm_label": "Confirm password",
+  "register.confirm_ph": "Re-enter password",
+  "register.cta": "Create account",
+  "register.have_account": "Already have an account?",
+  "register.signin": "Sign in",
+  "register.note": "Note: This is a frontend-only demo. Users are stored in localStorage.",
+
+  "register.ok_title": "Registered",
+  "register.ok_msg": "Account created. You can sign in now.",
+
+  "register.err_title": "Invalid input",
+  "register.err_username": "Username must be at least 3 characters.",
+  "register.err_email": "Please enter a valid email.",
+  "register.err_password": "Password must be at least 6 characters.",
+  "register.err_confirm": "Confirm password does not match.",
+  "register.err_username_exists": "Username already exists. Please choose another one.",
+  "register.err_email_exists": "Email already exists. Please use another one."
   
 };
 
@@ -1986,6 +2101,59 @@ const ja: Record<string, string> = {
   "web3.tx.erc20_sent": "{symbol} tx: {hash}",
 
   "web3.footer_safe": "アプリは秘密鍵/シードを保存しません。MetaMaskが署名します。安全なデモです。",
+  "login.page_title": "サインイン",
+  "login.title": "サインイン",
+  "login.desc": "続行するには認証してください。",
+  "login.subtitle": "安全なアクセス • リアルタイム分析 • 実行準備UI",
+
+  "login.username_label": "ユーザー名",
+  "login.username_ph": "admin",
+  "login.password_label": "パスワード",
+  "login.password_ph": "123456",
+  "login.remember": "ログイン状態を保持",
+  "login.forgot": "パスワードをお忘れですか？",
+  "login.cta": "続行",
+  // "login.demo": "デモアカウント: admin / 123456",
+
+  "login.ok_title": "アクセス許可",
+  "login.ok_msg": "Home Trading Systemへようこそ",
+  "login.fail_title": "認証失敗",
+  "login.fail_msg": "ユーザー名またはパスワードが正しくありません",
+
+  // Settings (sample)
+
+  "settings.theme": "テーマ",
+  "settings.theme_dark": "ダーク",
+  "settings.theme_light": "ライト",
+
+  "login.no_account": "アカウントがありませんか？",
+  "login.create_one": "作成する",
+
+  "register.title": "アカウント作成",
+  "register.desc": "フロントエンドデモ（localStorageに保存）。",
+  "register.username_label": "ユーザー名",
+  "register.username_ph": "例: trader01",
+  "register.email_label": "メール",
+  "register.email_ph": "you@company.com",
+  "register.password_label": "パスワード",
+  "register.password_ph": "6文字以上",
+  "register.confirm_label": "パスワード確認",
+  "register.confirm_ph": "再入力してください",
+  "register.cta": "アカウント作成",
+  "register.have_account": "すでにアカウントをお持ちですか？",
+  "register.signin": "サインイン",
+  "register.note": "注意: これはフロントエンドデモです。ユーザーはlocalStorageに保存されます。",
+
+  "register.ok_title": "登録完了",
+  "register.ok_msg": "アカウントを作成しました。今すぐサインインできます。",
+
+  "register.err_title": "入力が正しくありません",
+  "register.err_username": "ユーザー名は3文字以上で入力してください。",
+  "register.err_email": "有効なメールアドレスを入力してください。",
+  "register.err_password": "パスワードは6文字以上で入力してください。",
+  "register.err_confirm": "確認用パスワードが一致しません。",
+  "register.err_username_exists": "ユーザー名は既に存在します。別のユーザー名を選択してください。",
+  "register.err_email_exists": "メールは既に存在します。別のメールアドレスを使用してください。"
 
 };
 

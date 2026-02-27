@@ -63,9 +63,23 @@ function statusKey(s: RuleStatus) {
 
 function StatusBadge({ s }: { s: RuleStatus }) {
   const { t } = useI18n();
-  if (s === "PASS") return <Badge color="green" variant="light">{t(statusKey(s))}</Badge>;
-  if (s === "WARN") return <Badge color="yellow" variant="light">{t(statusKey(s))}</Badge>;
-  return <Badge color="red" variant="light">{t(statusKey(s))}</Badge>;
+  if (s === "PASS")
+    return (
+      <Badge color="green" variant="light">
+        {t(statusKey(s))}
+      </Badge>
+    );
+  if (s === "WARN")
+    return (
+      <Badge color="yellow" variant="light">
+        {t(statusKey(s))}
+      </Badge>
+    );
+  return (
+    <Badge color="red" variant="light">
+      {t(statusKey(s))}
+    </Badge>
+  );
 }
 
 function RiskBar({
@@ -89,9 +103,13 @@ function RiskBar({
   return (
     <div>
       <Group justify="space-between" mb={6}>
-        <Text size="sm" c="dimmed">{t(labelKey)}</Text>
+        <Text size="sm" c="dimmed">
+          {t(labelKey)}
+        </Text>
         <Text size="sm" fw={700}>
-          {used.toFixed(2)}{unit} / {limit.toFixed(2)}{unit}
+          {used.toFixed(2)}
+          {unit} / {limit.toFixed(2)}
+          {unit}
         </Text>
       </Group>
       <Progress value={pct} color={color} />
@@ -107,6 +125,71 @@ function overallKey(label: string) {
   if (label === "AT RISK") return "overall.at_risk";
   if (label === "COMPLIANT") return "overall.compliant";
   return "overall.unknown";
+}
+
+/** ✅ Tooltip đẹp + có chấm màu đúng slice */
+function ExposureTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: any[];
+}) {
+  if (!active || !payload?.length) return null;
+
+  const p = payload[0];
+  const name = p?.name ?? p?.payload?.name ?? "";
+  const value = p?.value ?? p?.payload?.value ?? 0;
+  const color = p?.payload?.fill || p?.color || "rgba(59,130,246,1)";
+
+  return (
+    <div
+      style={{
+        background: "rgba(255,255,255,0.88)",
+        border: "1px solid rgba(15,23,42,0.10)",
+        borderRadius: 12,
+        padding: "10px 12px",
+        boxShadow: "0 18px 50px rgba(15,23,42,0.15)",
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+      }}
+    >
+      <span
+        style={{
+          width: 10,
+          height: 10,
+          borderRadius: 999,
+          background: color,
+          boxShadow: "0 0 0 4px rgba(2,6,23,0.06)",
+          flex: "0 0 auto",
+        }}
+      />
+      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <div
+          style={{
+            fontWeight: 800,
+            fontSize: 13,
+            color: "rgba(15,23,42,0.92)",
+            lineHeight: 1.15,
+          }}
+        >
+          {name}
+        </div>
+        <div
+          style={{
+            fontWeight: 700,
+            fontSize: 12,
+            color: "rgba(15,23,42,0.65)",
+          }}
+        >
+          {value}%
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function PropRiskDashboard() {
@@ -215,8 +298,12 @@ export function PropRiskDashboard() {
     const id = setInterval(() => {
       setVol((prev) =>
         prev.map((x) => {
-          const atrStep = (Math.random() - 0.5) * (x.s === "XAUUSD" ? 0.9 : x.s === "USDJPY" ? 0.06 : 0.00025);
-          const sprStep = (Math.random() - 0.5) * (x.s === "XAUUSD" ? 0.04 : x.s === "USDJPY" ? 0.01 : 0.00003);
+          const atrStep =
+            (Math.random() - 0.5) *
+            (x.s === "XAUUSD" ? 0.9 : x.s === "USDJPY" ? 0.06 : 0.00025);
+          const sprStep =
+            (Math.random() - 0.5) *
+            (x.s === "XAUUSD" ? 0.04 : x.s === "USDJPY" ? 0.01 : 0.00003);
           const atr = +(x.atr + atrStep).toFixed(x.s === "XAUUSD" ? 2 : x.s === "USDJPY" ? 2 : 5);
           const spread = +(x.spread + sprStep).toFixed(x.s === "XAUUSD" ? 2 : x.s === "USDJPY" ? 2 : 5);
           return {
@@ -249,7 +336,7 @@ export function PropRiskDashboard() {
     pnl: number;
   };
 
-  const seedTimes = ["09:58","09:49","09:40","09:31","09:22","09:13","09:04","08:55","08:46","08:37"];
+  const seedTimes = ["09:58", "09:49", "09:40", "09:31", "09:22", "09:13", "09:04", "08:55", "08:46", "08:37"];
 
   const [trades, setTrades] = useState<TradeRow[]>(() => {
     const rows: TradeRow[] = [];
@@ -280,7 +367,7 @@ export function PropRiskDashboard() {
       const syms = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY"] as const;
       const s = syms[Math.floor(Math.random() * syms.length)];
       const side = Math.random() > 0.5 ? "BUY" : "SELL";
-      const lots = +(rnd(0.1, 1.2).toFixed(2));
+      const lots = +rnd(0.1, 1.2).toFixed(2);
       const pnl = Math.round(rnd(-120, 180));
 
       const newRow: TradeRow = {
@@ -305,7 +392,8 @@ export function PropRiskDashboard() {
     const wins = trades.filter((tt) => tt.pnl > 0).length;
     const winRate = (wins / n) * 100;
 
-    const avgWin = trades.filter((tt) => tt.pnl > 0).reduce((a, b) => a + b.pnl, 0) / Math.max(1, wins);
+    const avgWin =
+      trades.filter((tt) => tt.pnl > 0).reduce((a, b) => a + b.pnl, 0) / Math.max(1, wins);
     const losses = trades.filter((tt) => tt.pnl < 0);
     const avgLoss = losses.reduce((a, b) => a + Math.abs(b.pnl), 0) / Math.max(1, losses.length);
 
@@ -373,11 +461,14 @@ export function PropRiskDashboard() {
     const id = setInterval(() => {
       setWatch((prev) =>
         prev.map((x) => {
-          const step = (Math.random() - 0.5) * (x.s === "XAUUSD" ? 0.9 : x.s === "USDJPY" ? 0.06 : 0.0012);
+          const step =
+            (Math.random() - 0.5) *
+            (x.s === "XAUUSD" ? 0.9 : x.s === "USDJPY" ? 0.06 : 0.0012);
           const bid = +(x.bid + step).toFixed(x.s === "XAUUSD" ? 2 : x.s === "USDJPY" ? 2 : 4);
-          const ask = +(bid + (x.s === "XAUUSD" ? 0.17 : x.s === "USDJPY" ? 0.02 : 0.0001)).toFixed(
-            x.s === "XAUUSD" ? 2 : x.s === "USDJPY" ? 2 : 4
-          );
+          const ask = +(
+            bid +
+            (x.s === "XAUUSD" ? 0.17 : x.s === "USDJPY" ? 0.02 : 0.0001)
+          ).toFixed(x.s === "XAUUSD" ? 2 : x.s === "USDJPY" ? 2 : 4);
 
           const dir = bid > x.bid ? "up" : bid < x.bid ? "down" : "";
           if (dir) {
@@ -451,7 +542,8 @@ export function PropRiskDashboard() {
         <Stack gap={2}>
           <Title order={2}>{t("dashboard.title")}</Title>
           <Text size="sm" c="dimmed">
-            {account.plan} • {t("dashboard.account")} ${account.accountSize.toLocaleString()} • {t("dashboard.subtitle_tail")}
+            {account.plan} • {t("dashboard.account")} ${account.accountSize.toLocaleString()} •{" "}
+            {t("dashboard.subtitle_tail")}
           </Text>
         </Stack>
 
@@ -478,10 +570,7 @@ export function PropRiskDashboard() {
             onClick={() =>
               notifications.show({
                 title: t("notify.gate.title"),
-                message:
-                  overallStatus.label === "VIOLATION"
-                    ? t("notify.gate.blocked")
-                    : t("notify.gate.enabled"),
+                message: overallStatus.label === "VIOLATION" ? t("notify.gate.blocked") : t("notify.gate.enabled"),
               })
             }
           >
@@ -494,11 +583,14 @@ export function PropRiskDashboard() {
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>
         <MotionCard>
           <Paper withBorder radius="lg" p="md" style={{ minWidth: 0 }}>
-            <Text size="sm" c="dimmed">{t("kpi.equity")}</Text>
+            <Text size="sm" c="dimmed">
+              {t("kpi.equity")}
+            </Text>
             <Title order={3}>{fmtMoney(equity)}</Title>
             <Group gap={8} mt={6}>
               <Badge variant="light" color={pnlTodayPct >= 0 ? "green" : "red"}>
-                {pnlTodayPct >= 0 ? "+" : ""}{pnlTodayPct.toFixed(2)}% {t("kpi.today")}
+                {pnlTodayPct >= 0 ? "+" : ""}
+                {pnlTodayPct.toFixed(2)}% {t("kpi.today")}
               </Badge>
               {pnlTodayPct >= 0 ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
             </Group>
@@ -507,7 +599,9 @@ export function PropRiskDashboard() {
 
         <MotionCard>
           <Paper withBorder radius="lg" p="md" style={{ minWidth: 0 }}>
-            <Text size="sm" c="dimmed">{t("kpi.open_pl")}</Text>
+            <Text size="sm" c="dimmed">
+              {t("kpi.open_pl")}
+            </Text>
             <Title order={3} c={openPL >= 0 ? "green" : "red"}>
               {fmtSignedMoney(openPL)}
             </Title>
@@ -519,7 +613,9 @@ export function PropRiskDashboard() {
 
         <MotionCard>
           <Paper withBorder radius="lg" p="md" style={{ minWidth: 0 }}>
-            <Text size="sm" c="dimmed">{t("kpi.max_dd")}</Text>
+            <Text size="sm" c="dimmed">
+              {t("kpi.max_dd")}
+            </Text>
             <Title order={3}>{account.maxDrawdownPct}%</Title>
             <Text size="sm" c="dimmed" mt={6}>
               {t("common.limit")} ${maxDDLimit$.toFixed(0)}
@@ -529,7 +625,9 @@ export function PropRiskDashboard() {
 
         <MotionCard>
           <Paper withBorder radius="lg" p="md" style={{ minWidth: 0 }}>
-            <Text size="sm" c="dimmed">{t("kpi.daily_loss")}</Text>
+            <Text size="sm" c="dimmed">
+              {t("kpi.daily_loss")}
+            </Text>
             <Title order={3}>{account.dailyLossLimitPct}%</Title>
             <Text size="sm" c="dimmed" mt={6}>
               {t("common.limit")} ${dailyLossLimit$.toFixed(0)}
@@ -594,9 +692,7 @@ export function PropRiskDashboard() {
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                   <XAxis dataKey="t" tickFormatter={(v) => dayLabel(String(v))} />
                   <YAxis />
-                  <Tooltip
-                    labelFormatter={(v) => dayLabel(String(v))}
-                  />
+                  <Tooltip labelFormatter={(v) => dayLabel(String(v))} />
                   <Area type="monotone" dataKey="v" strokeWidth={2} fillOpacity={0.15} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -636,9 +732,13 @@ export function PropRiskDashboard() {
               {rules.map((r) => (
                 <Table.Tr key={r.name}>
                   <Table.Td>{r.name}</Table.Td>
-                  <Table.Td><StatusBadge s={r.status} /></Table.Td>
                   <Table.Td>
-                    <Text size="sm" c="dimmed">{r.detail}</Text>
+                    <StatusBadge s={r.status} />
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm" c="dimmed">
+                      {r.detail}
+                    </Text>
                   </Table.Td>
                 </Table.Tr>
               ))}
@@ -691,10 +791,7 @@ export function PropRiskDashboard() {
                   <Tooltip labelFormatter={(v) => dayLabel(String(v))} />
                   <Bar dataKey="p">
                     {dailyPnLLive.map((x, i) => (
-                      <Cell
-                        key={i}
-                        fill={x.p >= 0 ? "rgba(16,185,129,0.9)" : "rgba(239,68,68,0.9)"}
-                      />
+                      <Cell key={i} fill={x.p >= 0 ? "rgba(16,185,129,0.9)" : "rgba(239,68,68,0.9)"} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -750,7 +847,8 @@ export function PropRiskDashboard() {
                     <Table.Td>
                       <Text fw={700}>{w.s}</Text>
                       <Text size="xs" c={w.chg >= 0 ? "green" : "red"}>
-                        {w.chg >= 0 ? "+" : ""}{w.chg}% {t("wl.change")}
+                        {w.chg >= 0 ? "+" : ""}
+                        {w.chg}% {t("wl.change")}
                       </Text>
                     </Table.Td>
                     <Table.Td style={{ color }}>{w.bid}</Table.Td>
@@ -769,7 +867,9 @@ export function PropRiskDashboard() {
         <Paper withBorder radius="lg" p="md">
           <Group justify="space-between" mb="xs">
             <Text fw={700}>{t("exposure.title")}</Text>
-            <Badge variant="light">{exposureUsedPct}% {t("exposure.used")}</Badge>
+            <Badge variant="light">
+              {exposureUsedPct}% {t("exposure.used")}
+            </Badge>
           </Group>
 
           <div style={{ height: 260, minHeight: 260, width: "100%", minWidth: 0 }}>
@@ -787,20 +887,14 @@ export function PropRiskDashboard() {
                     strokeWidth={1}
                     isAnimationActive={false}
                   >
-                    {exposurePie.map((_, i) => (
-                      <Cell key={`cell-${i}`} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
+                    {exposurePie.map((_, i) => {
+                      const fill = PIE_COLORS[i % PIE_COLORS.length];
+                      return <Cell key={`cell-${i}`} fill={fill} />;
+                    })}
                   </Pie>
 
-                  <Tooltip
-                    formatter={(v: any, n: any) => [`${v}%`, n]}
-                    contentStyle={{
-                      background: "rgba(20,20,20,0.95)",
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      borderRadius: 10,
-                    }}
-                    labelStyle={{ color: "rgba(255,255,255,0.7)" }}
-                  />
+                  {/* ✅ đẹp + có dot màu đúng slice */}
+                  <Tooltip cursor={{ fill: "transparent" }} content={<ExposureTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -821,9 +915,13 @@ export function PropRiskDashboard() {
                       background: PIE_COLORS[i % PIE_COLORS.length],
                     }}
                   />
-                  <Text size="sm" c="dimmed">{x.name}</Text>
+                  <Text size="sm" c="dimmed">
+                    {x.name}
+                  </Text>
                 </Group>
-                <Text size="sm" fw={700}>{x.value}%</Text>
+                <Text size="sm" fw={700}>
+                  {x.value}%
+                </Text>
               </Group>
             ))}
           </Stack>
@@ -855,7 +953,9 @@ export function PropRiskDashboard() {
                   return (
                     <Table.Tr key={idx}>
                       <Table.Td>
-                        <Badge variant="light">{mm}:{ss}</Badge>
+                        <Badge variant="light">
+                          {mm}:{ss}
+                        </Badge>
                       </Table.Td>
                       <Table.Td>
                         <Badge color={c} variant="light">
@@ -863,7 +963,9 @@ export function PropRiskDashboard() {
                         </Badge>
                       </Table.Td>
                       <Table.Td>
-                        <Text fw={700} size="sm">{t(e.titleKey)}</Text>
+                        <Text fw={700} size="sm">
+                          {t(e.titleKey)}
+                        </Text>
                         <Text size="xs" c="dimmed">
                           {t("econ.prev")} {e.prev} • {t("econ.fcst")} {e.fc}
                         </Text>
@@ -875,11 +977,19 @@ export function PropRiskDashboard() {
                 <>
                   {Array.from({ length: 3 }).map((_, i) => (
                     <Table.Tr key={`econ-ph-${i}`}>
-                      <Table.Td><Badge variant="light">--:--</Badge></Table.Td>
-                      <Table.Td><Badge variant="light">--</Badge></Table.Td>
                       <Table.Td>
-                        <Text fw={700} size="sm">{t("common.loading")}</Text>
-                        <Text size="xs" c="dimmed">{t("econ.prev")} -- • {t("econ.fcst")} --</Text>
+                        <Badge variant="light">--:--</Badge>
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge variant="light">--</Badge>
+                      </Table.Td>
+                      <Table.Td>
+                        <Text fw={700} size="sm">
+                          {t("common.loading")}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {t("econ.prev")} -- • {t("econ.fcst")} --
+                        </Text>
                       </Table.Td>
                     </Table.Tr>
                   ))}
@@ -911,14 +1021,20 @@ export function PropRiskDashboard() {
                   <Badge variant="light" color={s.pnl >= 0 ? "green" : "red"}>
                     {s.pnl >= 0 ? "+" : ""}${s.pnl}
                   </Badge>
-                  <Badge variant="light">{s.win}% {t("journal.wr")}</Badge>
-                  <Badge variant="light">{s.trades} {t("journal.trades")}</Badge>
+                  <Badge variant="light">
+                    {s.win}% {t("journal.wr")}
+                  </Badge>
+                  <Badge variant="light">
+                    {s.trades} {t("journal.trades")}
+                  </Badge>
                 </Group>
               </Group>
             ))}
           </Stack>
 
-          <Text fw={700} mt="md" mb={6}>{t("heatmap.title")}</Text>
+          <Text fw={700} mt="md" mb={6}>
+            {t("heatmap.title")}
+          </Text>
           <div style={{ display: "grid", gridTemplateColumns: "80px repeat(3, 1fr)", gap: 6 }}>
             <div />
             {heatSessions.map((s) => (
@@ -929,14 +1045,19 @@ export function PropRiskDashboard() {
 
             {heatDays.map((d) => (
               <div key={d} style={{ display: "contents" }}>
-                <Text size="xs" c="dimmed">{dayLabel(d)}</Text>
+                <Text size="xs" c="dimmed">
+                  {dayLabel(d)}
+                </Text>
                 {heatSessions.map((s) => {
                   const v = heat[`${d}-${s}`] ?? 0;
                   const bg =
-                    v >= 120 ? "rgba(16,185,129,0.25)" :
-                      v >= 0 ? "rgba(16,185,129,0.12)" :
-                        v <= -120 ? "rgba(239,68,68,0.25)" :
-                          "rgba(239,68,68,0.12)";
+                    v >= 120
+                      ? "rgba(16,185,129,0.25)"
+                      : v >= 0
+                        ? "rgba(16,185,129,0.12)"
+                        : v <= -120
+                          ? "rgba(239,68,68,0.25)"
+                          : "rgba(239,68,68,0.12)";
                   return (
                     <div
                       key={`${d}-${s}`}
@@ -952,7 +1073,8 @@ export function PropRiskDashboard() {
                       }}
                       title={`${dayLabel(d)} • ${t(`session.${s}`)}: ${v >= 0 ? "+" : ""}${v}`}
                     >
-                      {v >= 0 ? "+" : ""}{v}
+                      {v >= 0 ? "+" : ""}
+                      {v}
                     </div>
                   );
                 })}
@@ -982,17 +1104,25 @@ export function PropRiskDashboard() {
                 const lvl = volBadge(x.atrPct, x.spreadPct);
                 return (
                   <Table.Tr key={x.s}>
-                    <Table.Td><Text fw={700}>{x.s}</Text></Table.Td>
+                    <Table.Td>
+                      <Text fw={700}>{x.s}</Text>
+                    </Table.Td>
                     <Table.Td>
                       <Text size="sm">{x.atr}</Text>
-                      <Text size="xs" c="dimmed">{x.atrPct}%</Text>
+                      <Text size="xs" c="dimmed">
+                        {x.atrPct}%
+                      </Text>
                     </Table.Td>
                     <Table.Td>
                       <Text size="sm">{x.spread}</Text>
-                      <Text size="xs" c="dimmed">{x.spreadPct}%</Text>
+                      <Text size="xs" c="dimmed">
+                        {x.spreadPct}%
+                      </Text>
                     </Table.Td>
                     <Table.Td>
-                      <Badge variant="light" color={lvl.color}>{t(lvl.key)}</Badge>
+                      <Badge variant="light" color={lvl.color}>
+                        {t(lvl.key)}
+                      </Badge>
                     </Table.Td>
                   </Table.Tr>
                 );
@@ -1044,35 +1174,65 @@ export function PropRiskDashboard() {
 
             <Stack gap={4} style={{ flex: 1 }}>
               <Group justify="space-between">
-                <Text size="sm" c="dimmed">{t("journal.expectancy")}</Text>
+                <Text size="sm" c="dimmed">
+                  {t("journal.expectancy")}
+                </Text>
 
                 {mounted ? (
                   <Badge variant="light" color={stats.expectancy >= 0 ? "green" : "red"}>
-                    {stats.expectancy >= 0 ? "+" : ""}{stats.expectancy.toFixed(1)} {t("journal.per_trade")}
+                    {stats.expectancy >= 0 ? "+" : ""}
+                    {stats.expectancy.toFixed(1)} {t("journal.per_trade")}
                   </Badge>
                 ) : (
-                  <Badge variant="light" color="gray">-- {t("journal.per_trade")}</Badge>
+                  <Badge variant="light" color="gray">
+                    -- {t("journal.per_trade")}
+                  </Badge>
                 )}
               </Group>
 
               <Group justify="space-between">
-                <Text size="sm" c="dimmed">{t("journal.avg_win")}</Text>
-                {mounted ? <Text size="sm" fw={700}>+{stats.avgWin.toFixed(0)}</Text> : <Text size="sm" fw={700}>--</Text>}
-              </Group>
-
-              <Group justify="space-between">
-                <Text size="sm" c="dimmed">{t("journal.avg_loss")}</Text>
-                {mounted ? <Text size="sm" fw={700}>-{stats.avgLoss.toFixed(0)}</Text> : <Text size="sm" fw={700}>--</Text>}
-              </Group>
-
-              <Group justify="space-between">
-                <Text size="sm" c="dimmed">{t("journal.total_10")}</Text>
+                <Text size="sm" c="dimmed">
+                  {t("journal.avg_win")}
+                </Text>
                 {mounted ? (
-                  <Text size="sm" fw={700} style={{ color: stats.total >= 0 ? "lime" : "red" }}>
-                    {stats.total >= 0 ? "+" : ""}{stats.total}
+                  <Text size="sm" fw={700}>
+                    +{stats.avgWin.toFixed(0)}
                   </Text>
                 ) : (
-                  <Text size="sm" fw={700}>--</Text>
+                  <Text size="sm" fw={700}>
+                    --
+                  </Text>
+                )}
+              </Group>
+
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">
+                  {t("journal.avg_loss")}
+                </Text>
+                {mounted ? (
+                  <Text size="sm" fw={700}>
+                    -{stats.avgLoss.toFixed(0)}
+                  </Text>
+                ) : (
+                  <Text size="sm" fw={700}>
+                    --
+                  </Text>
+                )}
+              </Group>
+
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">
+                  {t("journal.total_10")}
+                </Text>
+                {mounted ? (
+                  <Text size="sm" fw={700} style={{ color: stats.total >= 0 ? "lime" : "red" }}>
+                    {stats.total >= 0 ? "+" : ""}
+                    {stats.total}
+                  </Text>
+                ) : (
+                  <Text size="sm" fw={700}>
+                    --
+                  </Text>
                 )}
               </Group>
             </Stack>
@@ -1092,8 +1252,14 @@ export function PropRiskDashboard() {
               {mounted ? (
                 trades.map((tr, idx) => (
                   <Table.Tr key={tr.id ?? `${tr.t}-${tr.s}-${idx}`}>
-                    <Table.Td><Text size="sm" c="dimmed">{tr.t}</Text></Table.Td>
-                    <Table.Td><Text fw={700}>{tr.s}</Text></Table.Td>
+                    <Table.Td>
+                      <Text size="sm" c="dimmed">
+                        {tr.t}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <Text fw={700}>{tr.s}</Text>
+                    </Table.Td>
                     <Table.Td>
                       <Badge variant="light" color={tr.side === "BUY" ? "green" : "blue"}>
                         {t(tr.side === "BUY" ? "side.buy" : "side.sell")}
@@ -1101,7 +1267,8 @@ export function PropRiskDashboard() {
                     </Table.Td>
                     <Table.Td>{tr.lots}</Table.Td>
                     <Table.Td style={{ color: tr.pnl >= 0 ? "lime" : "red" }}>
-                      {tr.pnl >= 0 ? "+" : ""}{tr.pnl}
+                      {tr.pnl >= 0 ? "+" : ""}
+                      {tr.pnl}
                     </Table.Td>
                   </Table.Tr>
                 ))
@@ -1109,11 +1276,21 @@ export function PropRiskDashboard() {
                 <>
                   {Array.from({ length: 10 }).map((_, i) => (
                     <Table.Tr key={`ph-${i}`}>
-                      <Table.Td><Text size="sm" c="dimmed">--:--</Text></Table.Td>
-                      <Table.Td><Text fw={700}>----</Text></Table.Td>
-                      <Table.Td><Badge variant="light">--</Badge></Table.Td>
+                      <Table.Td>
+                        <Text size="sm" c="dimmed">
+                          --:--
+                        </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Text fw={700}>----</Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge variant="light">--</Badge>
+                      </Table.Td>
                       <Table.Td>--</Table.Td>
-                      <Table.Td><Text c="dimmed">--</Text></Table.Td>
+                      <Table.Td>
+                        <Text c="dimmed">--</Text>
+                      </Table.Td>
                     </Table.Tr>
                   ))}
                 </>

@@ -35,10 +35,20 @@ const config = createConfig({
   },
 });
 
+type Accent = "blue" | "green" | "purple" | "orange";
+type MantineAccent = "blue" | "green" | "violet" | "orange";
+
+function accentToMantine(a: Accent): MantineAccent {
+  return a === "purple" ? "violet" : a;
+}
+
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
 
   const [colorScheme, setColorScheme] = useState<"dark" | "light">("dark");
+
+  // ✅ NEW: giữ accent trong state để MantineProvider đổi primaryColor
+  const [accent, setAccent] = useState<Accent>("orange");
 
   // load from localStorage
   useEffect(() => {
@@ -48,9 +58,15 @@ export default function App({ Component, pageProps }: AppProps) {
     }
 
     // accent apply (optional)
-    const accent = localStorage.getItem("hts-accent");
-    if (accent) {
-      document.documentElement.setAttribute("data-hts-accent", accent);
+    const savedAccent = localStorage.getItem("hts-accent");
+    if (
+      savedAccent === "blue" ||
+      savedAccent === "green" ||
+      savedAccent === "purple" ||
+      savedAccent === "orange"
+    ) {
+      setAccent(savedAccent);
+      document.documentElement.setAttribute("data-hts-accent", savedAccent);
     }
 
     // listen event (Settings có thể bắn event để đổi theme live)
@@ -65,7 +81,8 @@ export default function App({ Component, pageProps }: AppProps) {
 
     const onAccentChanged = (e: any) => {
       const v = e?.detail;
-      if (typeof v === "string") {
+      if (v === "blue" || v === "green" || v === "purple" || v === "orange") {
+        setAccent(v); // ✅ NEW: update state
         document.documentElement.setAttribute("data-hts-accent", v);
         localStorage.setItem("hts-accent", v);
       }
@@ -117,7 +134,14 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <MantineProvider defaultColorScheme="dark" forceColorScheme={colorScheme}>
+        <MantineProvider
+          defaultColorScheme="dark"
+          forceColorScheme={colorScheme}
+          // ✅ NEW: apply accent vào Mantine theme
+          theme={{
+            primaryColor: accentToMantine(accent),
+          }}
+        >
           <Notifications position="top-right" />
           <I18nProvider>{content}</I18nProvider>
         </MantineProvider>
