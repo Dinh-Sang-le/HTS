@@ -34,6 +34,14 @@ function getDomScheme(): "dark" | "light" {
   const v = document.documentElement.getAttribute("data-mantine-color-scheme");
   return v === "light" ? "light" : "dark";
 }
+export type TradingChartProps = {
+  symbol: any;
+  candles: any[];
+  position: any | null;
+  positions: any[];
+  fills: any[];
+  rightBadges?: React.ReactNode;
+};
 
 export default function TradingChart({
   symbol,

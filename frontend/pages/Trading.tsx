@@ -47,11 +47,17 @@ import PositionsTable from "@/components/PositionsTable";
 
 import { useI18n } from "@/lib/i18nProvider";
 
+// ✅ PATCH: give dynamic component a stable typed signature (prevents “red underline” JSX inference issues)
+import type { TradingChartProps } from "@/components/TradingChart";
+
 // Chart SSR off
-const TradingChart = dynamic(() => import("@/components/TradingChart"), {
-  ssr: false,
-  loading: () => <div style={{ height: "100%", width: "100%" }} />,
-});
+const TradingChart = dynamic<TradingChartProps>(
+  () => import("@/components/TradingChart").then((m) => m.default),
+  {
+    ssr: false,
+    loading: () => <div style={{ height: "100%", width: "100%" }} />,
+  }
+);
 
 /* ===================== i18n helpers ===================== */
 
@@ -155,10 +161,25 @@ export default function TradingInstitutionalPage() {
   const orders = useTradeStore((s) => s.orders);
   const clearOrders = useTradeStore((s) => s.clearOrders);
   const hasHydrated = useTradeStore((s) => s.hasHydrated);
+
   const pos = getOpenPosition(symbol);
+
   const fills = useTradeStore((s) => s.fills);
   const fillsForSymbol = useMemo(() => fills.filter((f) => f.symbol === symbol), [fills, symbol]);
+
   const positions = useTradeStore((s) => s.positions);
+
+  // ✅ PATCH: normalize data for chart rendering (NO logic change, only shape)
+  const candlesSafe = useMemo(() => candles ?? [], [candles]);
+
+  const positionsArr = useMemo(() => {
+    // store positions is usually Record<id, Position> -> chart wants Position[]
+    return Object.values(positions || {}).filter(Boolean) as any[];
+  }, [positions]);
+
+  const positionsForSymbol = useMemo(() => {
+    return positionsArr.filter((p) => p.symbol === symbol);
+  }, [positionsArr, symbol]);
 
   // confirm modal
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -209,9 +230,23 @@ export default function TradingInstitutionalPage() {
   const risk = useMemo(() => evaluateRisk(riskSnap), [riskSnap]);
 
   const statusBadge = useMemo(() => {
-    if (risk.status === "VIOLATION") return <Badge color="red" variant="light">{t("trading.risk.violation")}</Badge>;
-    if (risk.status === "AT_RISK") return <Badge color="yellow" variant="light">{t("trading.risk.at_risk")}</Badge>;
-    return <Badge color="green" variant="light">{t("trading.risk.compliant")}</Badge>;
+    if (risk.status === "VIOLATION")
+      return (
+        <Badge color="red" variant="light">
+          {t("trading.risk.violation")}
+        </Badge>
+      );
+    if (risk.status === "AT_RISK")
+      return (
+        <Badge color="yellow" variant="light">
+          {t("trading.risk.at_risk")}
+        </Badge>
+      );
+    return (
+      <Badge color="green" variant="light">
+        {t("trading.risk.compliant")}
+      </Badge>
+    );
   }, [risk.status, t]);
 
   const [ticketPrice, setTicketPrice] = useState<number | null>(null);
@@ -310,12 +345,16 @@ export default function TradingInstitutionalPage() {
             </Text>
 
             <Group justify="space-between">
-              <Text size="sm" c="dimmed">{t("trading.modal.sl")}</Text>
+              <Text size="sm" c="dimmed">
+                {t("trading.modal.sl")}
+              </Text>
               <Text size="sm">{lastPlaced.sl ? formatPrice(lastPlaced.sym as any, lastPlaced.sl) : "--"}</Text>
             </Group>
 
             <Group justify="space-between">
-              <Text size="sm" c="dimmed">{t("trading.modal.tp")}</Text>
+              <Text size="sm" c="dimmed">
+                {t("trading.modal.tp")}
+              </Text>
               <Text size="sm">{lastPlaced.tp ? formatPrice(lastPlaced.sym as any, lastPlaced.tp) : "--"}</Text>
             </Group>
 
@@ -398,11 +437,7 @@ export default function TradingInstitutionalPage() {
 
       {/* Symbol tabs */}
       <Group justify="space-between">
-        <SegmentedControl
-          value={symbol}
-          onChange={(v) => setSymbol(v as SymbolName)}
-          data={symbols.map((s) => ({ value: s, label: s }))}
-        />
+        <SegmentedControl value={symbol} onChange={(v) => setSymbol(v as SymbolName)} data={symbols.map((s) => ({ value: s, label: s }))} />
 
         <Group gap="xs">
           <Button variant="light" onClick={() => setShowLadder((v) => !v)}>
@@ -417,25 +452,31 @@ export default function TradingInstitutionalPage() {
       {/* KPI row */}
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>
         <MotionCard withBorder radius="lg" p="md" variants={cardAnim} initial="hidden" animate="show" style={{ background: cardBg }}>
-          <Text size="sm" c="dimmed">{t("trading.kpi.last")}</Text>
-          <Title order={3}>
-            {mounted ? last.toFixed(symbol === "XAUUSD" || symbol === "USDJPY" ? 2 : 4) : "--"}
-          </Title>
+          <Text size="sm" c="dimmed">
+            {t("trading.kpi.last")}
+          </Text>
+          <Title order={3}>{mounted ? last.toFixed(symbol === "XAUUSD" || symbol === "USDJPY" ? 2 : 4) : "--"}</Title>
           <Badge variant="light" color={chg >= 0 ? "green" : "red"} mt={6}>
             {mounted ? `${fmtSignedPct(chg)}% (mock)` : "--"}
           </Badge>
         </MotionCard>
 
         <MotionCard withBorder radius="lg" p="md" variants={cardAnim} initial="hidden" animate="show" style={{ background: cardBg }}>
-          <Text size="sm" c="dimmed">{t("trading.kpi.open_pl")}</Text>
+          <Text size="sm" c="dimmed">
+            {t("trading.kpi.open_pl")}
+          </Text>
           <Title order={3} c={mounted ? (openPL >= 0 ? "green" : "red") : "dimmed"} suppressHydrationWarning>
             {mounted ? `${openPL >= 0 ? "+" : "-"}$${Math.abs(openPL).toFixed(0)}` : "--"}
           </Title>
-          <Text size="sm" c="dimmed" mt={6}>{t("trading.kpi.mtm_mock")}</Text>
+          <Text size="sm" c="dimmed" mt={6}>
+            {t("trading.kpi.mtm_mock")}
+          </Text>
         </MotionCard>
 
         <MotionCard withBorder radius="lg" p="md" variants={cardAnim} initial="hidden" animate="show" style={{ background: cardBg }}>
-          <Text size="sm" c="dimmed">{t("trading.kpi.exposure_used")}</Text>
+          <Text size="sm" c="dimmed">
+            {t("trading.kpi.exposure_used")}
+          </Text>
           <Title order={3}>{mounted ? `${riskSnap.exposureUsedPct.toFixed(0)}%` : "--"}</Title>
           <Badge variant="light" color={riskSnap.exposureUsedPct >= 80 ? "yellow" : "green"} mt={6}>
             {mounted ? (riskSnap.exposureUsedPct >= 80 ? t("trading.kpi.near_cap") : t("trading.kpi.ok")) : "--"}
@@ -443,7 +484,9 @@ export default function TradingInstitutionalPage() {
         </MotionCard>
 
         <MotionCard withBorder radius="lg" p="md" variants={cardAnim} initial="hidden" animate="show" style={{ background: cardBg }}>
-          <Text size="sm" c="dimmed">{t("trading.kpi.daily_loss_used")}</Text>
+          <Text size="sm" c="dimmed">
+            {t("trading.kpi.daily_loss_used")}
+          </Text>
           <Title order={3}>{mounted ? `${riskSnap.dailyLossUsedPct.toFixed(0)}%` : "--"}</Title>
           <Badge variant="light" color={riskSnap.dailyLossUsedPct >= 80 ? "yellow" : "green"} mt={6}>
             {mounted ? (riskSnap.dailyLossUsedPct >= 80 ? t("trading.kpi.near_limit") : t("trading.kpi.ok")) : "--"}
@@ -504,13 +547,15 @@ export default function TradingInstitutionalPage() {
           >
             <TradingChart
               symbol={symbol}
-              candles={candles}
+              candles={candlesSafe}
               position={pos ?? null}
-              positions={positions}
+              positions={positionsForSymbol}
               fills={fillsForSymbol}
               rightBadges={
                 <>
-                  <Badge variant="light">{t("trading.spread")} {spread ?? "--"}</Badge>
+                  <Badge variant="light">
+                    {t("trading.spread")} {spread ?? "--"}
+                  </Badge>
                   <Badge variant="light" color={risk.blocked ? "red" : "green"}>
                     {risk.blocked ? t("trading.state.blocked") : t("trading.state.ready")}
                   </Badge>
@@ -523,15 +568,7 @@ export default function TradingInstitutionalPage() {
         </MotionCard>
 
         {/* Order Ticket */}
-        <MotionCard
-          withBorder
-          radius="lg"
-          p="md"
-          style={{ minWidth: 0, background: cardBg }}
-          variants={cardAnim}
-          initial="hidden"
-          animate="show"
-        >
+        <MotionCard withBorder radius="lg" p="md" style={{ minWidth: 0, background: cardBg }} variants={cardAnim} initial="hidden" animate="show">
           <Group justify="space-between" mb="xs">
             <Text fw={700}>{t("trading.ticket.title")}</Text>
             <Badge variant="light" color={risk.blocked ? "red" : "green"}>
@@ -605,7 +642,9 @@ export default function TradingInstitutionalPage() {
           />
 
           <Divider my="sm" />
-          <Text size="xs" c="dimmed">{t("trading.ticket.tip_dom_click")}</Text>
+          <Text size="xs" c="dimmed">
+            {t("trading.ticket.tip_dom_click")}
+          </Text>
         </MotionCard>
       </SimpleGrid>
 
@@ -662,7 +701,9 @@ export default function TradingInstitutionalPage() {
               }}
             >
               <div>
-                <Text fw={800} size="sm">#{o.id}</Text>
+                <Text fw={800} size="sm">
+                  #{o.id}
+                </Text>
                 <Text size="xs" c="dimmed">
                   {tFmt("trading.history.row_summary", {
                     sym: o.sym,
@@ -682,7 +723,11 @@ export default function TradingInstitutionalPage() {
             </Group>
           ))}
 
-          {!orders.length ? <Text size="sm" c="dimmed">{t("trading.history.empty")}</Text> : null}
+          {!orders.length ? (
+            <Text size="sm" c="dimmed">
+              {t("trading.history.empty")}
+            </Text>
+          ) : null}
         </Stack>
       </MotionCard>
 
@@ -702,7 +747,9 @@ export default function TradingInstitutionalPage() {
           {showFootprint ? (
             <FootprintMock symbol={symbol} mid={depth?.mid ?? tick?.last ?? null} />
           ) : (
-            <Text size="sm" c="dimmed">{t("trading.fp.footprint_hidden")}</Text>
+            <Text size="sm" c="dimmed">
+              {t("trading.fp.footprint_hidden")}
+            </Text>
           )}
         </FloatingPanel>
       </SimpleGrid>
