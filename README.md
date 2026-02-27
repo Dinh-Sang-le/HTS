@@ -1,6 +1,5 @@
 # HTS
 
-
 # 🚀 HTS – Home Trading System
 
 HTS is a modern **Home Trading System** built with Next.js and TypeScript.
@@ -89,7 +88,7 @@ Clone repository:
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/HTS.git
-cd HTS
+cd HTS/frontend
 ```
 
 Install dependencies:
@@ -147,22 +146,85 @@ npm start
 
 # 🐳 Docker Deployment
 
-Build Docker image:
+HTS runs on **port 3100** inside Docker.
+
+## Build Docker image
+
+Make sure you are inside the `frontend` folder:
 
 ```bash
-docker build -t hts .
+docker build -t hts-frontend .
 ```
 
-Run container:
+## Run container
 
 ```bash
-docker run -p 3000:3000 hts
+docker run -d --name hts-frontend -p 3100:3100 hts-frontend
 ```
 
-Open:
+Open in browser:
 
 ```
-http://localhost:3000
+http://localhost:3100
+```
+
+---
+
+## 🌐 Access from Local Network (LAN)
+
+1️⃣ Find your IP address:
+
+Windows:
+
+```bash
+ipconfig
+```
+
+Look for `IPv4 Address`.
+
+Example:
+
+```
+192.168.1.15
+```
+
+2️⃣ Access from another device:
+
+```
+http://192.168.1.15:3100
+```
+
+---
+
+## 🔄 Auto Restart (Recommended)
+
+```bash
+docker rm -f hts-frontend
+docker run -d --restart unless-stopped --name hts-frontend -p 3100:3100 hts-frontend
+```
+
+---
+
+## 🔥 Windows Firewall (If LAN Fails)
+
+Run PowerShell as Administrator:
+
+```powershell
+netsh advfirewall firewall add rule name="HTS 3100" dir=in action=allow protocol=TCP localport=3100
+```
+
+---
+
+## Stop container
+
+```bash
+docker stop hts-frontend
+```
+
+## Remove container
+
+```bash
+docker rm -f hts-frontend
 ```
 
 ---
@@ -309,13 +371,13 @@ It does NOT:
 - Execute real financial trades
 - Handle real funds
 
-For and simulation purposes only.
+For simulation purposes only.
 
 ---
 
 # 👨‍💻 Author
 
-Sang Le
+Sang Le  
 Institutional Trading Simulator – HTS
 
 ---

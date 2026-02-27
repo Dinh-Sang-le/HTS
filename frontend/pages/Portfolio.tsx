@@ -534,7 +534,7 @@ export default function PortfolioPage() {
               <Title order={3}>{mounted ? `${usedPct}%` : "--"}</Title>
             </div>
             <Badge variant="light">
-              {mounted ? t("portfolio.kpi.used_badge", { pct: usedPct }) : "--"}
+              {mounted ? (t as any)("portfolio.kpi.used_badge", { pct: usedPct }) : "--"}
             </Badge>
           </Group>
           <Text size="sm" c="dimmed" mt={6}>
@@ -558,7 +558,7 @@ export default function PortfolioPage() {
             <Group gap="xs">
               <Text fw={800}>{t("portfolio.allocation")}</Text>
               <Badge variant="light">
-                {mounted ? t("portfolio.kpi.used_badge", { pct: usedPct }) : "--"}
+                {mounted ? (t as any)("portfolio.kpi.used_badge", { pct: usedPct }) : "--"}
               </Badge>
             </Group>
             <Badge variant="light">{t("portfolio.badge.bloom_glow")}</Badge>
@@ -595,25 +595,34 @@ export default function PortfolioPage() {
                       paddingAngle={2}
                       stroke="rgba(255,255,255,0.10)"
                       strokeWidth={1}
-                      activeIndex={activeAlloc}
-                      activeShape={renderActiveShape}
-                      onMouseEnter={(_, idx) => setActiveAlloc(idx)}
-                      onMouseLeave={() => setActiveAlloc(-1)}
-                      isAnimationActive={true}
-                      animationDuration={420}
+                      {...({
+                        activeIndex: typeof activeAlloc === "number" ? activeAlloc : -1,
+                        activeShape: renderActiveShape,
+                        onMouseEnter: (_: any, idx: number) => setActiveAlloc(idx),
+                        onMouseLeave: () => setActiveAlloc(-1),
+                        isAnimationActive: true,
+                        animationDuration: 420,
+                      } as any)}
                     >
                       {(allocationWithColor as any[]).map((_, i) => {
                         const isActive = i === activeAlloc;
                         const c = PIE_COLORS[i % PIE_COLORS.length];
+
                         return (
                           <Cell
                             key={`cell-${i}`}
                             fill={c}
-                            stroke={isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.12)"}
+                            stroke={
+                              isActive
+                                ? "rgba(255,255,255,0.9)"
+                                : "rgba(255,255,255,0.12)"
+                            }
                             strokeWidth={isActive ? 1.6 : 1}
                             style={{
                               cursor: "pointer",
-                              filter: isActive ? `drop-shadow(0px 0px 12px ${c}) brightness(1.12)` : "none",
+                              filter: isActive
+                                ? `drop-shadow(0px 0px 12px ${c}) brightness(1.12)`
+                                : "none",
                               transition: "filter 140ms ease, stroke-width 140ms ease",
                             }}
                           />
@@ -787,7 +796,7 @@ export default function PortfolioPage() {
                   <Table.Td>
                     <Text fw={900}>{h.s}</Text>
                     <Text size="xs" c="dimmed">
-                      {t("portfolio.exposure", { pct: h.exposurePct })}
+                      {(t as any)("portfolio.exposure", { pct: h.exposurePct })}
                     </Text>
                   </Table.Td>
 

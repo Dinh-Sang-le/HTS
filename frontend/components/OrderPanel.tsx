@@ -100,7 +100,7 @@ export default function OrderPanel(props: {
       {draft.type === "LIMIT" ? (
         <NumberInput
           label="Limit price"
-          value={draft.limitPrice}
+          value={draft.limitPrice ?? undefined}
           onChange={(v) => setDraft((d) => ({ ...d, limitPrice: v == null ? null : Number(v) }))}
           min={0}
           decimalScale={spec.digits}
@@ -123,14 +123,14 @@ export default function OrderPanel(props: {
       <Group grow>
         <NumberInput
           label="SL (pips)"
-          value={draft.slPips}
+          value={draft.slPips ?? undefined}
           onChange={(v) => setDraft((d) => ({ ...d, slPips: v == null ? null : Number(v) }))}
           min={0}
           step={1}
         />
         <NumberInput
           label="TP (pips)"
-          value={draft.tpPips}
+          value={draft.tpPips ?? undefined}
           onChange={(v) => setDraft((d) => ({ ...d, tpPips: v == null ? null : Number(v) }))}
           min={0}
           step={1}

@@ -164,7 +164,7 @@ export default function TradingChart({
     const chart = createChart(el, {
       width: el.clientWidth,
       height: el.clientHeight,
-      ...themeOptions,
+      ...(themeOptions as any),
       handleScroll: {
         mouseWheel: true,
         pressedMouseMove: true,
@@ -264,7 +264,7 @@ export default function TradingChart({
     const curSpacing = ts.options().barSpacing ?? 14;
 
     chart.applyOptions({
-      ...themeOptions,
+      ...(themeOptions as any),
       timeScale: {
         ...(themeOptions as any).timeScale,
         barSpacing: curSpacing,

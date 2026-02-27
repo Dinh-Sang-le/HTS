@@ -9,6 +9,7 @@ import {
   Paper,
   Text,
   useMantineTheme,
+  useMantineColorScheme, // ✅ add
 } from "@mantine/core";
 import { IconPin, IconPinnedOff, IconX } from "@tabler/icons-react";
 
@@ -32,7 +33,10 @@ export default function FloatingPanel({
   style,
 }: Props) {
   const theme = useMantineTheme();
-  const isDark = theme.colorScheme === "dark";
+
+  // ✅ FIX: Mantine v7 colorScheme is from hook, not theme
+  const { colorScheme } = useMantineColorScheme();
+  const isDark = colorScheme === "dark";
 
   const [mounted, setMounted] = useState(false);
   const [docked, setDocked] = useState(defaultDocked);

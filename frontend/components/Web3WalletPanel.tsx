@@ -219,7 +219,7 @@ export default function Web3WalletPanel() {
       setNativeHash(hash);
       notifications.show({
         title: t("web3.tx.sent_title"),
-        message: t("web3.tx.native_sent", { hash: shortAddr(hash) }),
+        message: (t as any)("web3.tx.native_sent", { hash: shortAddr(hash) }),
       });
 
       setTo("");
@@ -309,10 +309,10 @@ export default function Web3WalletPanel() {
       setErc20Hash(hash);
       notifications.show({
         title: t("web3.tx.sent_title"),
-        message: t("web3.tx.erc20_sent", {
-          symbol: selectedToken.symbol,
-          hash: shortAddr(hash),
-        }),
+        message: (t as any)("web3.tx.erc20_sent", {
+        symbol: selectedToken.symbol,
+        hash: shortAddr(hash),
+      }),
       });
 
       setErc20To("");
@@ -520,8 +520,8 @@ export default function Web3WalletPanel() {
             onChange={(e) => setErc20Amt(e.currentTarget.value)}
             placeholder={
               selectedToken
-                ? t("web3.amount_sym_ph", { sym: selectedToken.symbol })
-                : t("web3.amount_ph")
+            ? (t as any)("web3.amount_sym_ph", { sym: selectedToken.symbol })
+            : t("web3.amount_ph")
             }
             style={{ width: 160 }}
             disabled={!isConnected || !selectedToken}

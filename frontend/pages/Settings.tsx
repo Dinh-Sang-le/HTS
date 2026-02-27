@@ -252,7 +252,7 @@ export default function SettingsPage() {
 
     notifications.show({
       title: t("common.save"),
-      message: t("settings.toast.saved", {
+      message: (t as any)("settings.toast.saved", {
         lang: String(draftLang).toUpperCase(),
         theme: next.themeMode,
         accent: next.accent,
