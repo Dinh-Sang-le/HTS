@@ -1,9 +1,9 @@
 # HTS
 
 
-# 🚀 HTS – Institutional Trading Simulator
+# 🚀 HTS – Home Trading System
 
-HTS is a modern **Institutional-Style Paper Trading Platform** built with Next.js and TypeScript.
+HTS is a modern **Home Trading System** built with Next.js and TypeScript.
 It simulates a proprietary trading environment including a trading engine, risk engine, order management system (OMS), and Web3 integration.
 
 ---
